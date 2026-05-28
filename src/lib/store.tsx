@@ -9,12 +9,6 @@ import type {
   MessageTemplate,
 } from "./types";
 import {
-  seedClients,
-  seedThemes,
-  seedQuotes,
-  seedContracts,
-  seedEvents,
-  seedTransactions,
   seedTemplates,
 } from "./seed";
 
@@ -56,13 +50,14 @@ function usePersisted<T>(key: string, seed: T): [T, (v: T) => void] {
 }
 
 export function StoreProvider({ children }: { children: ReactNode }) {
-  const [clients, setClients] = usePersisted("fc_clients", seedClients);
-  const [themes, setThemes] = usePersisted("fc_themes", seedThemes);
-  const [quotes, setQuotes] = usePersisted("fc_quotes", seedQuotes);
-  const [contracts, setContracts] = usePersisted("fc_contracts", seedContracts);
-  const [events, setEvents] = usePersisted("fc_events", seedEvents);
-  const [transactions, setTransactions] = usePersisted("fc_tx", seedTransactions);
-  const [templates] = usePersisted("fc_templates", seedTemplates);
+  const [clients, setClients] = usePersisted("app_clients", [] as Client[]);
+  const [themes, setThemes] = usePersisted("app_themes", [] as PartyTheme[]);
+  const [quotes, setQuotes] = usePersisted("app_quotes", [] as Quote[]);
+  const [contracts, setContracts] = usePersisted("app_contracts", [] as Contract[]);
+  const [events, setEvents] = usePersisted("app_events", [] as CalendarEvent[]);
+  const [transactions, setTransactions] = usePersisted("app_tx", [] as Transaction[]);
+  const [templates] = usePersisted("app_templates", seedTemplates);
+
 
   return (
     <Ctx.Provider
