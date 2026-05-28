@@ -18,6 +18,14 @@ const empty = (): Contract => ({
   signed: false,
   signature: "",
   createdAt: new Date().toISOString().slice(0, 10),
+  customTerms: "*Regras de uso:*\n" +
+    "• A decoração é locada no formato Pegue e Monte, com retirada/montagem conforme combinado.\n" +
+    "• O cliente é responsável pela conservação das peças durante o período de locação.\n" +
+    "• Não é permitido o uso de fitas, colas ou objetos que danifiquem as peças.\n\n" +
+    "*Regras de devolução:*\n" +
+    "• A devolução deve ocorrer na data e horário acordados, com as peças limpas.\n" +
+    "• Peças danificadas ou perdidas serão cobradas conforme valor de reposição.\n" +
+    "• O sinal não é reembolsável em caso de cancelamento com menos de 7 dias.",
 });
 
 const RULES_USE = [
@@ -37,8 +45,7 @@ const contractText = (c: Contract) =>
   `Tema: ${c.theme} • Festa em ${fmtDate(c.partyDate)}\n` +
   `Valor total: ${brl(c.value)} • Sinal: ${brl(c.deposit)}\n` +
   `Restante: ${brl(c.value - c.deposit)}\n\n` +
-  `*Regras de uso:*\n${RULES_USE.map((r) => "• " + r).join("\n")}\n\n` +
-  `*Regras de devolução:*\n${RULES_RETURN.map((r) => "• " + r).join("\n")}\n\n` +
+  `${c.customTerms || ""}\n\n` +
   (c.signed ? `✍️ Assinado digitalmente por: ${c.signature}` : "Aguardando assinatura.");
 
 export default function Contracts() {
@@ -159,6 +166,16 @@ export default function Contracts() {
           </Field>
           <Field label="Valor total (R$)"><Input type="number" value={c.value || ""} onChange={(e) => setC({ ...c, value: +e.target.value })} /></Field>
           <Field label="Valor do sinal (R$)"><Input type="number" value={c.deposit || ""} onChange={(e) => setC({ ...c, deposit: +e.target.value })} /></Field>
+          <div className="col-span-full">
+            <Field label="Termos e Regras do Contrato">
+              <textarea 
+                className="w-full rounded-xl border border-white/60 bg-white/50 px-4 py-3 text-sm text-stone-700 outline-none focus:border-lilac-400 focus:ring-1 focus:ring-lilac-400"
+                rows={8}
+                value={c.customTerms || ""}
+                onChange={(e) => setC({ ...c, customTerms: e.target.value })}
+              />
+            </Field>
+          </div>
         </div>
         <div className="mt-6 flex gap-3"><Button variant="ghost" onClick={() => setOpen(false)} className="ml-auto">Cancelar</Button><Button onClick={save}>Gerar contrato</Button></div>
       </Modal>

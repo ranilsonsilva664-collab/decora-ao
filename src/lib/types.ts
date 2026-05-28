@@ -58,6 +58,7 @@ export interface Contract {
   signed: boolean;
   signature: string;
   createdAt: string;
+  customTerms?: string;
 }
 
 export interface CalendarEvent {
