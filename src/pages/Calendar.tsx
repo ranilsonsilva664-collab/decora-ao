@@ -149,7 +149,7 @@ export default function Calendar() {
         )}
         <div className="mt-6 flex gap-3">
           {events.some((x) => x.id === e.id) && (
-            <Button variant="soft" className="!text-rose-500" onClick={() => { setEvents(events.filter((x) => x.id !== e.id)); setOpen(false); toast("Festa removida"); }}>Excluir</Button>
+            <Button variant="soft" className="!text-rose-500" onClick={() => { setEvents(events.filter((x) => x.id !== e.id)); setOpen(false); toast("Evento removido"); }}>Excluir</Button>
           )}
           <Button variant="ghost" onClick={() => setOpen(false)} className="ml-auto">Cancelar</Button>
           <Button onClick={save}>Salvar</Button>

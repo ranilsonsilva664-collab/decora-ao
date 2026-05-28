@@ -88,9 +88,11 @@ export default function Inventory() {
           <Field label="Status"><Select value={t.status} onChange={(e) => setT({ ...t, status: e.target.value as ThemeStatus })}>{STATUSES.map((s) => <option key={s}>{s}</option>)}</Select></Field>
         </div>
         <div className="mt-6 flex gap-3">
-          {themes.some((x) => x.id === t.id) && <Button variant="soft" className="!text-rose-500" onClick={() => { setThemes(themes.filter((x) => x.id !== t.id)); setOpen(false); toast("Tema removido"); }}>Excluir</Button>}
+          {themes.some((x) => x.id === t.id) && (
+            <Button variant="soft" className="!text-rose-500" onClick={() => { setThemes(themes.filter((x) => x.id !== t.id)); setOpen(false); toast("Tema removido"); }}>Excluir</Button>
+          )}
           <Button variant="ghost" onClick={() => setOpen(false)} className="ml-auto">Cancelar</Button>
-          <Button onClick={save}>Salvar</Button>
+          <Button onClick={save}>Salvar tema</Button>
         </div>
       </Modal>
     </div>

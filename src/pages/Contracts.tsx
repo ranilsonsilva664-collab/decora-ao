@@ -167,7 +167,13 @@ export default function Contracts() {
             </Field>
           </div>
         </div>
-        <div className="mt-6 flex gap-3"><Button variant="ghost" onClick={() => setOpen(false)} className="ml-auto">Cancelar</Button><Button onClick={save}>Gerar contrato</Button></div>
+        <div className="mt-6 flex gap-3">
+          {contracts.some(x => x.id === c.id) && (
+            <Button variant="soft" className="!text-rose-500" onClick={() => { setContracts(contracts.filter(x => x.id !== c.id)); setOpen(false); toast("Contrato removido"); }}>Excluir</Button>
+          )}
+          <Button variant="ghost" onClick={() => setOpen(false)} className="ml-auto">Cancelar</Button>
+          <Button onClick={save}>Gerar contrato</Button>
+        </div>
       </Modal>
 
       <Modal open={!!signOpen} onClose={() => setSignOpen(null)} title="Assinatura digital">

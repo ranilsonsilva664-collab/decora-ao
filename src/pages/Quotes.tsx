@@ -144,8 +144,11 @@ export default function Quotes() {
           </div>
         </div>
         <div className="mt-6 flex gap-3">
+          {quotes.some((x) => x.id === q.id) && (
+            <Button variant="soft" className="!text-rose-500" onClick={() => { setQuotes(quotes.filter((x) => x.id !== q.id)); setOpen(false); toast("Orçamento removido"); }}>Excluir</Button>
+          )}
           <Button variant="ghost" onClick={() => setOpen(false)} className="ml-auto">Cancelar</Button>
-          <Button onClick={save}>Salvar</Button>
+          <Button onClick={save}>Salvar orçamento</Button>
         </div>
       </Modal>
     </div>

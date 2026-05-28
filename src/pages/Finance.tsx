@@ -134,7 +134,9 @@ export default function Finance() {
           <Field label="Data"><Input type="date" value={tx.date} onChange={(e) => setTx({ ...tx, date: e.target.value })} /></Field>
         </div>
         <div className="mt-6 flex gap-3">
-          {transactions.some((x) => x.id === tx.id) && <Button variant="soft" className="!text-rose-500" onClick={() => { setTransactions(transactions.filter((x) => x.id !== tx.id)); setOpen(false); toast("Lançamento removido"); }}>Excluir</Button>}
+          {transactions.some((x) => x.id === tx.id) && (
+            <Button variant="soft" className="!text-rose-500" onClick={() => { setTransactions(transactions.filter((x) => x.id !== tx.id)); setOpen(false); toast("Transação removida"); }}>Excluir</Button>
+          )}
           <Button variant="ghost" onClick={() => setOpen(false)} className="ml-auto">Cancelar</Button>
           <Button onClick={save}>Salvar</Button>
         </div>
