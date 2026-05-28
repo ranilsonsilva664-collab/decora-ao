@@ -7,51 +7,34 @@ import { copy, waLink } from "../lib/helpers";
 import { useToast } from "../components/Toast";
 import type { Contract } from "../lib/types";
 
-const empty = (): Contract => ({
-  id: uid(),
-  clientName: "",
-  cpf: "",
-  partyDate: "",
-  theme: "",
-  value: 0,
-  deposit: 0,
-  signed: false,
-  signature: "",
-  createdAt: new Date().toISOString().slice(0, 10),
-  customTerms: "*Regras de uso:*\n" +
-    "• A decoração é locada no formato Pegue e Monte, com retirada/montagem conforme combinado.\n" +
-    "• O cliente é responsável pela conservação das peças durante o período de locação.\n" +
-    "• Não é permitido o uso de fitas, colas ou objetos que danifiquem as peças.\n\n" +
-    "*Regras de devolução:*\n" +
-    "• A devolução deve ocorrer na data e horário acordados, com as peças limpas.\n" +
-    "• Peças danificadas ou perdidas serão cobradas conforme valor de reposição.\n" +
-    "• O sinal não é reembolsável em caso de cancelamento com menos de 7 dias.",
-});
-
-const RULES_USE = [
-  "A decoração é locada no formato Pegue e Monte, com retirada/montagem conforme combinado.",
-  "O cliente é responsável pela conservação das peças durante o período de locação.",
-  "Não é permitido o uso de fitas, colas ou objetos que danifiquem as peças.",
-];
-const RULES_RETURN = [
-  "A devolução deve ocorrer na data e horário acordados, com as peças limpas.",
-  "Peças danificadas ou perdidas serão cobradas conforme valor de reposição.",
-  "O sinal não é reembolsável em caso de cancelamento com menos de 7 dias.",
-];
-
-const contractText = (c: Contract) =>
-  `📑 *CONTRATO DE LOCAÇÃO — Festa & Cia*\n\n` +
-  `Contratante: ${c.clientName} (CPF ${c.cpf || "—"})\n` +
-  `Tema: ${c.theme} • Festa em ${fmtDate(c.partyDate)}\n` +
-  `Valor total: ${brl(c.value)} • Sinal: ${brl(c.deposit)}\n` +
-  `Restante: ${brl(c.value - c.deposit)}\n\n` +
-  `${c.customTerms || ""}\n\n` +
-  (c.signed ? `✍️ Assinado digitalmente por: ${c.signature}` : "Aguardando assinatura.");
-
 export default function Contracts() {
-  const { contracts, setContracts, clients, themes } = useStore();
+  const { contracts, setContracts, clients, themes, contractRules, setContractRules } = useStore();
   const toast = useToast();
   const [open, setOpen] = useState(false);
+
+  const empty = (): Contract => ({
+    id: uid(),
+    clientName: "",
+    cpf: "",
+    partyDate: "",
+    theme: "",
+    value: 0,
+    deposit: 0,
+    signed: false,
+    signature: "",
+    createdAt: new Date().toISOString().slice(0, 10),
+    customTerms: contractRules,
+  });
+
+  const contractText = (c: Contract) =>
+    `📑 *CONTRATO DE LOCAÇÃO — Festa & Cia*\n\n` +
+    `Contratante: ${c.clientName} (CPF ${c.cpf || "—"})\n` +
+    `Tema: ${c.theme} • Festa em ${fmtDate(c.partyDate)}\n` +
+    `Valor total: ${brl(c.value)} • Sinal: ${brl(c.deposit)}\n` +
+    `Restante: ${brl(c.value - c.deposit)}\n\n` +
+    `${c.customTerms || ""}\n\n` +
+    (c.signed ? `✍️ Assinado digitalmente por: ${c.signature}` : "Aguardando assinatura.");
+
   const [c, setC] = useState<Contract>(empty());
   const [signOpen, setSignOpen] = useState<Contract | null>(null);
   const [sigName, setSigName] = useState("");
@@ -145,10 +128,17 @@ export default function Contracts() {
       </div>
 
       {/* Rules reference */}
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Card><SectionTitle title="Regras de uso" /><ul className="space-y-2 text-sm text-stone-600">{RULES_USE.map((r, i) => <li key={i} className="flex gap-2"><span className="text-lilac-400">•</span>{r}</li>)}</ul></Card>
-        <Card><SectionTitle title="Regras de devolução" /><ul className="space-y-2 text-sm text-stone-600">{RULES_RETURN.map((r, i) => <li key={i} className="flex gap-2"><span className="text-nude-400">•</span>{r}</li>)}</ul></Card>
-      </div>
+      <Card>
+        <div className="mb-4">
+          <SectionTitle title="Regras Padrão do Contrato" subtitle="Estes termos serão carregados automaticamente ao gerar um novo contrato. Você pode alterá-los aqui." />
+        </div>
+        <textarea
+          className="w-full rounded-xl border border-white/60 bg-white/50 px-4 py-3 text-sm text-stone-700 outline-none focus:border-lilac-400 focus:ring-1 focus:ring-lilac-400"
+          rows={10}
+          value={contractRules}
+          onChange={(e) => setContractRules(e.target.value)}
+        />
+      </Card>
 
       <Modal open={open} onClose={() => setOpen(false)} title="Gerar contrato" wide>
         <div className="grid gap-4 sm:grid-cols-2">
