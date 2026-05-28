@@ -101,15 +101,15 @@ function Shell() {
       </div>
 
       {/* Mobile bottom nav */}
-      <nav className="fixed inset-x-0 bottom-0 z-40 flex items-center justify-around border-t border-white/60 bg-white/70 px-2 py-2 backdrop-blur-xl lg:hidden">
-        {MOBILE_NAV.map((id) => {
-          const n = NAV.find((x) => x.id === id)!;
+      <nav className="fixed inset-x-0 bottom-0 z-40 flex items-center gap-2 overflow-x-auto border-t border-white/60 bg-white/70 px-4 py-2 backdrop-blur-xl lg:hidden [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+        {NAV.map((n) => {
+          const id = n.id;
           return (
             <button
               key={id}
               onClick={() => setPage(id)}
               className={cn(
-                "flex flex-1 flex-col items-center gap-0.5 rounded-xl py-1.5 text-[10px] font-medium transition",
+                "flex min-w-[72px] shrink-0 flex-col items-center gap-0.5 rounded-xl py-1.5 text-[10px] font-medium transition",
                 page === id ? "text-lilac-400" : "text-stone-400",
               )}
             >
