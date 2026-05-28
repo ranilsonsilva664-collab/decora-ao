@@ -1,0 +1,90 @@
+@import "tailwindcss";
+
+@theme {
+  --color-nude-50: #fdf8f6;
+  --color-nude-100: #f9ece8;
+  --color-nude-200: #f3d9d2;
+  --color-nude-300: #ecc3b8;
+  --color-nude-400: #e0a193;
+  --color-nude-500: #d18a7a;
+  --color-rose: #e7b4ae;
+  --color-lilac-100: #f1ecfb;
+  --color-lilac-200: #e3d8f7;
+  --color-lilac-300: #c9b6ee;
+  --color-lilac-400: #a98fe0;
+  --color-gold: #c9a45c;
+  --color-gold-soft: #e6cf9a;
+  --font-display: "Poppins", ui-sans-serif, system-ui, sans-serif;
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+  body {
+    font-family: "Poppins", ui-sans-serif, system-ui, sans-serif;
+    background:
+      radial-gradient(1200px 600px at 100% -10%, #f1ecfb 0%, transparent 55%),
+      radial-gradient(900px 500px at -10% 110%, #f9ece8 0%, transparent 50%),
+      #fdfbfa;
+    -webkit-font-smoothing: antialiased;
+  }
+  ::-webkit-scrollbar {
+    width: 9px;
+    height: 9px;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #e3d8f7;
+    border-radius: 999px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+}
+
+@layer utilities {
+  .glass {
+    background: rgba(255, 255, 255, 0.6);
+    backdrop-filter: blur(18px) saturate(140%);
+    -webkit-backdrop-filter: blur(18px) saturate(140%);
+    border: 1px solid rgba(255, 255, 255, 0.7);
+  }
+  .glass-soft {
+    background: rgba(255, 255, 255, 0.45);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.6);
+  }
+  .text-gradient {
+    background: linear-gradient(120deg, #d18a7a, #a98fe0 60%, #c9a45c);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  .animate-rise {
+    animation: rise 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+  .animate-fade {
+    animation: fade 0.4s ease both;
+  }
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
