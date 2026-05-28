@@ -3,13 +3,13 @@ import { getAnalytics } from "firebase/analytics";
 import { getFirestore } from "firebase/firestore";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyA_oQJ2efek6QG-08YDGI1j0F5DuQsEXp4",
-  authDomain: "decora-c29a2.firebaseapp.com",
-  projectId: "decora-c29a2",
-  storageBucket: "decora-c29a2.firebasestorage.app",
-  messagingSenderId: "832564979501",
-  appId: "1:832564979501:web:9c4606f45164f8c79795a4",
-  measurementId: "G-SD35V9GY8J"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
 };
 
 export const app = initializeApp(firebaseConfig);
