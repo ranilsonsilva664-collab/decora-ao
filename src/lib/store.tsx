@@ -113,8 +113,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       }
 
       const tenant = tenantDoc.data() as Tenant;
-      if (tenant.status === "blocked") {
-        return { success: false, error: "Este acesso está bloqueado. Contate o suporte." };
+      if (tenant.status !== "active") return { success: false, error: "Acesso bloqueado." };
+      
+      if (tenant.isTest && tenant.expiresAt && new Date() > new Date(tenant.expiresAt)) {
+        // Automatically block them in firestore for future? Maybe not strictly necessary right here, just block login.
+        return { success: false, error: "O período de teste (24h) expirou." };
       }
 
       setIsAdmin(false);

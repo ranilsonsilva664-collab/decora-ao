@@ -97,6 +97,9 @@ export type TenantStatus = "active" | "blocked";
 export interface Tenant {
   id: string; // The access code, e.g., "MARIA123"
   name: string;
+  whatsapp?: string;
+  isTest?: boolean;
+  expiresAt?: string;
   status: TenantStatus;
   createdAt: string;
 }
