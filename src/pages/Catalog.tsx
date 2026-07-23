@@ -84,12 +84,14 @@ export default function Catalog({ tenantId }: { tenantId: string }) {
           </div>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-            {items.map(item => (
+            {items.map(item => {
+              const mainPhoto = (item.photos && item.photos.length > 0) ? item.photos[0] : item.photo;
+              return (
               <div key={item.id} className="group flex flex-col overflow-hidden rounded-2xl bg-white shadow-sm transition hover:shadow-xl hover:shadow-lilac-200/40">
                 <div className="relative aspect-square w-full bg-stone-100 overflow-hidden">
-                  {item.photo ? (
+                  {mainPhoto ? (
                     <img 
-                      src={item.photo} 
+                      src={mainPhoto} 
                       alt={item.name} 
                       className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110" 
                     />
@@ -108,7 +110,7 @@ export default function Catalog({ tenantId }: { tenantId: string }) {
                   </div>
                 </div>
               </div>
-            ))}
+            )})}
           </div>
         )}
       </main>

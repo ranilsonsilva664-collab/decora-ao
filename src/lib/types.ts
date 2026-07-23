@@ -109,6 +109,7 @@ export interface InventoryItem {
   name: string;
   quantity: number;
   photo?: string;
+  photos?: string[];
   showInCatalog?: boolean;
 }
 
