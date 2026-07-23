@@ -1,17 +1,17 @@
 @import "tailwindcss";
 
 @theme {
-  --color-nude-50: #fdf8f6;
-  --color-nude-100: #f9ece8;
-  --color-nude-200: #f3d9d2;
-  --color-nude-300: #ecc3b8;
-  --color-nude-400: #e0a193;
-  --color-nude-500: #d18a7a;
-  --color-rose: #e7b4ae;
-  --color-lilac-100: #f1ecfb;
-  --color-lilac-200: #e3d8f7;
-  --color-lilac-300: #c9b6ee;
-  --color-lilac-400: #a98fe0;
+  --color-nude-50: #fdf2f8;
+  --color-nude-100: #fce7f3;
+  --color-nude-200: #fbcfe8;
+  --color-nude-300: #f9a8d4;
+  --color-nude-400: #ec4899;
+  --color-nude-500: #db2777;
+  --color-rose: #f43f5e;
+  --color-lilac-100: #fae8ff;
+  --color-lilac-200: #f5d0fe;
+  --color-lilac-300: #f0abfc;
+  --color-lilac-400: #d946ef;
   --color-gold: #c9a45c;
   --color-gold-soft: #e6cf9a;
   --font-display: "Poppins", ui-sans-serif, system-ui, sans-serif;
@@ -24,7 +24,7 @@
   body {
     font-family: "Poppins", ui-sans-serif, system-ui, sans-serif;
     background: 
-      linear-gradient(rgba(255, 255, 255, 0.65), rgba(255, 255, 255, 0.75)),
+      linear-gradient(rgba(255, 255, 255, 0.35), rgba(255, 255, 255, 0.45)),
       url('https://res.cloudinary.com/dmxeqe939/image/upload/v1784816943/Exciting_Giveaway__Win_Sparkling_Prizes_with_Colorful_Balloons_emdkyu.jpg') center/cover fixed;
     -webkit-font-smoothing: antialiased;
   }
@@ -43,10 +43,10 @@
 
 @layer utilities {
   .glass {
-    background: rgba(255, 255, 255, 0.6);
-    backdrop-filter: blur(18px) saturate(140%);
-    -webkit-backdrop-filter: blur(18px) saturate(140%);
-    border: 1px solid rgba(255, 255, 255, 0.7);
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(24px) saturate(160%);
+    -webkit-backdrop-filter: blur(24px) saturate(160%);
+    border: 1px solid rgba(255, 255, 255, 0.9);
   }
   .glass-soft {
     background: rgba(255, 255, 255, 0.45);
