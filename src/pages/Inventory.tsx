@@ -27,8 +27,9 @@ export default function Inventory() {
 
   const saveTheme = () => {
     if (!t.name.trim()) return toast("Informe o nome do tema");
-    const exists = themes.some((x) => x.id === t.id);
-    setThemes(exists ? themes.map((x) => (x.id === t.id ? t : x)) : [t, ...themes]);
+    const safeThemes = themes || [];
+    const exists = safeThemes.some((x) => x.id === t.id);
+    setThemes(exists ? safeThemes.map((x) => (x.id === t.id ? t : x)) : [t, ...safeThemes]);
     setOpenTheme(false);
     toast(exists ? "Tema atualizado!" : "Tema adicionado!");
   };
@@ -36,15 +37,19 @@ export default function Inventory() {
   const saveItem = () => {
     if (!item.name.trim()) return toast("Informe o nome do item");
     if (item.quantity < 1) return toast("A quantidade deve ser maior que zero");
-    const exists = inventoryItems.some((x) => x.id === item.id);
-    setInventoryItems(exists ? inventoryItems.map((x) => (x.id === item.id ? item : x)) : [item, ...inventoryItems]);
+    const safeItems = inventoryItems || [];
+    const exists = safeItems.some((x) => x.id === item.id);
+    setInventoryItems(exists ? safeItems.map((x) => (x.id === item.id ? item : x)) : [item, ...safeItems]);
     setOpenItem(false);
     toast(exists ? "Item atualizado!" : "Item adicionado!");
   };
 
-  const totalInvested = themes.reduce((s, t) => s + t.invested, 0);
-  const totalRevenue = themes.reduce((s, t) => s + t.revenue, 0);
-  const totalRentals = themes.reduce((s, t) => s + t.rentals, 0);
+  const safeThemes = themes || [];
+  const safeItems = inventoryItems || [];
+
+  const totalInvested = safeThemes.reduce((s, t) => s + t.invested, 0);
+  const totalRevenue = safeThemes.reduce((s, t) => s + t.revenue, 0);
+  const totalRentals = safeThemes.reduce((s, t) => s + t.rentals, 0);
 
   return (
     <div className="space-y-5">
@@ -84,7 +89,7 @@ export default function Inventory() {
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {themes.map((item) => {
+            {safeThemes.map((item) => {
               const roi = item.invested ? ((item.revenue - item.invested) / item.invested) * 100 : 0;
               return (
                 <Card key={item.id} className="animate-rise">
@@ -108,7 +113,7 @@ export default function Inventory() {
                 </Card>
               );
             })}
-            {themes.length === 0 && (
+            {safeThemes.length === 0 && (
               <div className="col-span-full py-12 text-center text-stone-500">Nenhum tema cadastrado.</div>
             )}
           </div>
@@ -117,7 +122,7 @@ export default function Inventory() {
 
       {tab === "items" && (
         <div className="grid gap-4 sm:grid-cols-3 xl:grid-cols-4">
-          {inventoryItems.map((it) => (
+          {safeItems.map((it) => (
             <Card key={it.id} className="animate-rise flex items-center justify-between p-4">
               <div>
                 <p className="font-semibold text-stone-800">{it.name}</p>
@@ -131,7 +136,7 @@ export default function Inventory() {
               </button>
             </Card>
           ))}
-          {inventoryItems.length === 0 && (
+          {safeItems.length === 0 && (
             <div className="col-span-full py-12 text-center text-stone-500">Nenhum item avulso cadastrado. (Ex: Cilindros, Arcos, etc)</div>
           )}
         </div>
@@ -154,8 +159,8 @@ export default function Inventory() {
           <Field label="Status"><Select value={t.status} onChange={(e) => setT({ ...t, status: e.target.value as ThemeStatus })}>{STATUSES.map((s) => <option key={s}>{s}</option>)}</Select></Field>
         </div>
         <div className="mt-6 flex gap-3">
-          {themes.some((x) => x.id === t.id) && (
-            <Button variant="soft" className="!text-rose-500" onClick={() => { setThemes(themes.filter((x) => x.id !== t.id)); setOpenTheme(false); toast("Tema removido"); }}>Excluir</Button>
+          {safeThemes.some((x) => x.id === t.id) && (
+            <Button variant="soft" className="!text-rose-500" onClick={() => { setThemes(safeThemes.filter((x) => x.id !== t.id)); setOpenTheme(false); toast("Tema removido"); }}>Excluir</Button>
           )}
           <Button variant="ghost" onClick={() => setOpenTheme(false)} className="ml-auto">Cancelar</Button>
           <Button onClick={saveTheme}>Salvar tema</Button>
@@ -172,8 +177,8 @@ export default function Inventory() {
           </Field>
         </div>
         <div className="mt-6 flex gap-3">
-          {inventoryItems.some((x) => x.id === item.id) && (
-            <Button variant="soft" className="!text-rose-500" onClick={() => { setInventoryItems(inventoryItems.filter((x) => x.id !== item.id)); setOpenItem(false); toast("Item removido"); }}>Excluir</Button>
+          {safeItems.some((x) => x.id === item.id) && (
+            <Button variant="soft" className="!text-rose-500" onClick={() => { setInventoryItems(safeItems.filter((x) => x.id !== item.id)); setOpenItem(false); toast("Item removido"); }}>Excluir</Button>
           )}
           <Button variant="ghost" onClick={() => setOpenItem(false)} className="ml-auto">Cancelar</Button>
           <Button onClick={saveItem}>Salvar item</Button>
