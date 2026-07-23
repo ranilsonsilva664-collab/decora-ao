@@ -56,7 +56,11 @@ const Ctx = createContext<State | null>(null);
 export function StoreProvider({ children }: { children: ReactNode }) {
   const [tenantId, setTenantId] = useState<string | null>(() => localStorage.getItem("crm_tenant_id"));
   const [isAdmin, setIsAdmin] = useState<boolean>(() => localStorage.getItem("crm_is_admin") === "true");
-  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isLoading, setIsLoading] = useState<boolean>(() => {
+    const tid = localStorage.getItem("crm_tenant_id");
+    const admin = localStorage.getItem("crm_is_admin") === "true";
+    return Boolean(tid || admin);
+  });
   const [data, setData] = useState<TenantData>(DEFAULT_DATA);
 
   // Fetch or listen to tenant data
