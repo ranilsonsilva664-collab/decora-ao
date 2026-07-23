@@ -9,6 +9,7 @@ import Quotes from "./pages/Quotes";
 import Contracts from "./pages/Contracts";
 import Calendar from "./pages/Calendar";
 import Inventory from "./pages/Inventory";
+import Stock from "./pages/Stock";
 import Finance from "./pages/Finance";
 import Messages from "./pages/Messages";
 import Login from "./pages/Login";
@@ -21,6 +22,7 @@ export type Page =
   | "contracts"
   | "calendar"
   | "inventory"
+  | "stock"
   | "finance"
   | "messages";
 
@@ -30,12 +32,14 @@ const NAV: { id: Page; label: string; icon: (p: { className?: string }) => React
   { id: "quotes", label: "Orçamentos", icon: Icon.quote },
   { id: "contracts", label: "Contratos", icon: Icon.contract },
   { id: "calendar", label: "Agenda", icon: Icon.calendar },
-  { id: "inventory", label: "Acervo", icon: Icon.inventory },
+  { id: "inventory", label: "Temas", icon: Icon.inventory },
+  { id: "stock", label: "Estoque", icon: Icon.box },
   { id: "finance", label: "Financeiro", icon: Icon.finance },
   { id: "messages", label: "Mensagens", icon: Icon.message },
 ];
 
 import AdminLogin from "./pages/AdminLogin";
+import Catalog from "./pages/Catalog";
 
 // Bottom bar gets the most-used 5
 const MOBILE_NAV: Page[] = ["dashboard", "clients", "quotes", "calendar", "finance"];
@@ -45,6 +49,11 @@ function Shell() {
   const { tenantId, isAdmin, isLoading, logout } = useStore();
 
   const isRouteAdmin = window.location.pathname.startsWith('/admin');
+  const catalogMatch = window.location.pathname.match(/^\/catalog\/(.+)$/);
+
+  if (catalogMatch) {
+    return <Catalog tenantId={catalogMatch[1]} />;
+  }
 
   if (isLoading) {
     return <div className="flex min-h-screen items-center justify-center font-medium text-stone-500">Carregando CRM...</div>;
@@ -73,6 +82,7 @@ function Shell() {
       case "contracts": return <Contracts />;
       case "calendar": return <Calendar />;
       case "inventory": return <Inventory />;
+      case "stock": return <Stock />;
       case "finance": return <Finance />;
       case "messages": return <Messages />;
     }

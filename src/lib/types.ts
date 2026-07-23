@@ -108,6 +108,8 @@ export interface InventoryItem {
   id: string;
   name: string;
   quantity: number;
+  photo?: string;
+  showInCatalog?: boolean;
 }
 
 export interface TenantData {
@@ -120,4 +122,5 @@ export interface TenantData {
   transactions: Transaction[];
   templates: MessageTemplate[];
   contractRules: string;
+  catalogEnabled?: boolean;
 }

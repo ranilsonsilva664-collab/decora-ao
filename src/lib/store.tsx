@@ -34,6 +34,7 @@ const DEFAULT_DATA: TenantData = {
   transactions: [],
   templates: seedTemplates,
   contractRules: DEFAULT_CONTRACT_RULES,
+  catalogEnabled: false,
 };
 
 interface State extends TenantData {
@@ -51,6 +52,7 @@ interface State extends TenantData {
   setEvents: (v: CalendarEvent[]) => void;
   setTransactions: (v: Transaction[]) => void;
   setContractRules: (v: string) => void;
+  setCatalogEnabled: (v: boolean) => void;
 }
 
 const Ctx = createContext<State | null>(null);
@@ -168,6 +170,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         setEvents: (v) => updateData("events", v),
         setTransactions: (v) => updateData("transactions", v),
         setContractRules: (v) => updateData("contractRules", v),
+        setCatalogEnabled: (v) => updateData("catalogEnabled", v),
       }}
     >
       {children}
