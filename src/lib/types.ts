@@ -91,3 +91,23 @@ export interface MessageTemplate {
   emoji: string;
   body: string;
 }
+
+export type TenantStatus = "active" | "blocked";
+
+export interface Tenant {
+  id: string; // The access code, e.g., "MARIA123"
+  name: string;
+  status: TenantStatus;
+  createdAt: string;
+}
+
+export interface TenantData {
+  clients: Client[];
+  themes: PartyTheme[];
+  quotes: Quote[];
+  contracts: Contract[];
+  events: CalendarEvent[];
+  transactions: Transaction[];
+  templates: MessageTemplate[];
+  contractRules: string;
+}

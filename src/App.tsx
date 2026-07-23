@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { StoreProvider } from "./lib/store";
+import { StoreProvider, useStore } from "./lib/store";
 import { ToastProvider } from "./components/Toast";
 import { Icon } from "./components/icons";
 import { cn } from "./utils/cn";
@@ -11,6 +11,8 @@ import Calendar from "./pages/Calendar";
 import Inventory from "./pages/Inventory";
 import Finance from "./pages/Finance";
 import Messages from "./pages/Messages";
+import Login from "./pages/Login";
+import Admin from "./pages/Admin";
 
 export type Page =
   | "dashboard"
@@ -33,11 +35,21 @@ const NAV: { id: Page; label: string; icon: (p: { className?: string }) => React
   { id: "messages", label: "Mensagens", icon: Icon.message },
 ];
 
-// Bottom bar gets the most-used 5
-const MOBILE_NAV: Page[] = ["dashboard", "clients", "quotes", "calendar", "finance"];
-
 function Shell() {
   const [page, setPage] = useState<Page>("dashboard");
+  const { tenantId, isAdmin, isLoading, logout } = useStore();
+
+  if (isLoading) {
+    return <div className="flex min-h-screen items-center justify-center text-stone-500">Carregando...</div>;
+  }
+
+  if (isAdmin) {
+    return <Admin />;
+  }
+
+  if (!tenantId) {
+    return <Login />;
+  }
 
   const render = () => {
     switch (page) {
@@ -60,7 +72,7 @@ function Shell() {
           <span className="grid h-11 w-11 place-items-center rounded-2xl bg-gradient-to-br from-nude-400 to-lilac-400 text-xl shadow-lg shadow-lilac-200">🎀</span>
           <div>
             <p className="font-semibold leading-tight text-stone-800">Festa &amp; Cia</p>
-            <p className="text-[11px] text-stone-400">CRM Pegue e Monte</p>
+            <p className="text-[11px] text-stone-500">Código: <span className="font-bold text-stone-700">{tenantId}</span></p>
           </div>
         </div>
         {NAV.map((n) => (
@@ -80,7 +92,7 @@ function Shell() {
         ))}
         <div className="mt-auto rounded-2xl bg-gradient-to-br from-lilac-100 to-nude-100 p-4 text-center">
           <p className="text-2xl">💕</p>
-          <p className="mt-1 text-xs font-medium text-stone-600">Decoração que encanta em cada detalhe</p>
+          <button onClick={logout} className="mt-2 w-full rounded-xl bg-white/60 px-3 py-2 text-xs font-semibold text-stone-600 transition hover:bg-white/80">Sair da Conta</button>
         </div>
       </aside>
 
@@ -90,11 +102,16 @@ function Shell() {
         <header className="sticky top-0 z-30 flex items-center justify-between border-b border-white/60 bg-white/50 px-4 py-3 backdrop-blur-xl lg:hidden">
           <div className="flex items-center gap-2">
             <span className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-nude-400 to-lilac-400 text-lg">🎀</span>
-            <p className="font-semibold text-stone-800">Festa &amp; Cia</p>
+            <p className="font-semibold text-stone-800">{tenantId}</p>
           </div>
-          <button onClick={() => setPage("messages")} className="grid h-9 w-9 place-items-center rounded-xl bg-emerald-50 text-emerald-500">
-            <Icon.wa className="h-5 w-5" />
-          </button>
+          <div className="flex items-center gap-2">
+            <button onClick={() => setPage("messages")} className="grid h-9 w-9 place-items-center rounded-xl bg-emerald-50 text-emerald-500">
+              <Icon.wa className="h-5 w-5" />
+            </button>
+            <button onClick={logout} className="grid h-9 w-9 place-items-center rounded-xl bg-white/60 text-stone-500">
+              <Icon.logout className="h-5 w-5" />
+            </button>
+          </div>
         </header>
 
         <main className="mx-auto w-full max-w-7xl flex-1 p-4 pb-28 sm:p-6 lg:pb-8">{render()}</main>
