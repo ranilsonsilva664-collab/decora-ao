@@ -35,18 +35,32 @@ const NAV: { id: Page; label: string; icon: (p: { className?: string }) => React
   { id: "messages", label: "Mensagens", icon: Icon.message },
 ];
 
+import AdminLogin from "./pages/AdminLogin";
+
+// Bottom bar gets the most-used 5
+const MOBILE_NAV: Page[] = ["dashboard", "clients", "quotes", "calendar", "finance"];
+
 function Shell() {
   const [page, setPage] = useState<Page>("dashboard");
   const { tenantId, isAdmin, isLoading, logout } = useStore();
 
+  const isRouteAdmin = window.location.pathname.startsWith('/admin');
+
   if (isLoading) {
-    return <div className="flex min-h-screen items-center justify-center text-stone-500">Carregando...</div>;
+    return <div className="flex min-h-screen items-center justify-center font-medium text-stone-500">Carregando CRM...</div>;
   }
 
+  // Se já estiver logado como Admin, mostra o painel de Admin
   if (isAdmin) {
     return <Admin />;
   }
 
+  // Se não estiver logado e a rota for /admin, mostra o Login de Admin
+  if (isRouteAdmin && !tenantId) {
+    return <AdminLogin />;
+  }
+
+  // Se não estiver logado e for a rota principal, mostra o Login de Decoradora
   if (!tenantId) {
     return <Login />;
   }
@@ -92,7 +106,7 @@ function Shell() {
         ))}
         <div className="mt-auto rounded-2xl bg-gradient-to-br from-lilac-100 to-nude-100 p-4 text-center">
           <p className="text-2xl">💕</p>
-          <button onClick={logout} className="mt-2 w-full rounded-xl bg-white/60 px-3 py-2 text-xs font-semibold text-stone-600 transition hover:bg-white/80">Sair da Conta</button>
+          <button onClick={() => { logout(); window.location.href = '/'; }} className="mt-2 w-full rounded-xl bg-white/60 px-3 py-2 text-xs font-semibold text-stone-600 transition hover:bg-white/80">Sair da Conta</button>
         </div>
       </aside>
 
@@ -108,7 +122,7 @@ function Shell() {
             <button onClick={() => setPage("messages")} className="grid h-9 w-9 place-items-center rounded-xl bg-emerald-50 text-emerald-500">
               <Icon.wa className="h-5 w-5" />
             </button>
-            <button onClick={logout} className="grid h-9 w-9 place-items-center rounded-xl bg-white/60 text-stone-500">
+            <button onClick={() => { logout(); window.location.href = '/'; }} className="grid h-9 w-9 place-items-center rounded-xl bg-white/60 text-stone-500">
               <Icon.logout className="h-5 w-5" />
             </button>
           </div>
