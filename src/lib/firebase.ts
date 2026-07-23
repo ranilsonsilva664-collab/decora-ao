@@ -1,6 +1,6 @@
 import { initializeApp } from "firebase/app";
 import { getAnalytics, isSupported, Analytics } from "firebase/analytics";
-import { initializeFirestore, persistentLocalCache } from "firebase/firestore";
+import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from "firebase/firestore";
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -21,5 +21,5 @@ isSupported().then(supported => {
 }).catch(console.error);
 
 export const db = initializeFirestore(app, {
-  localCache: persistentLocalCache()
+  localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
 });
