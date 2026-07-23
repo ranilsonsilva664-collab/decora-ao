@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useStore } from "../lib/store";
+import { InstallPWA } from "../components/InstallPWA";
 
 export default function Login() {
   const { login } = useStore();
@@ -23,8 +24,12 @@ export default function Login() {
   return (
     <div className="flex min-h-screen items-center justify-center p-4">
       <div className="w-full max-w-sm glass rounded-3xl p-8 text-center shadow-xl">
-        <div className="mx-auto mb-6 grid h-16 w-16 place-items-center rounded-2xl bg-gradient-to-br from-nude-400 to-lilac-400 text-3xl shadow-lg shadow-lilac-200">
-          🎀
+        <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-3xl bg-white shadow-lg shadow-lilac-200 p-1">
+          <img 
+            src="https://res.cloudinary.com/dmxeqe939/image/upload/v1784820761/ChatGPT_Image_23_de_jul._de_2026_12_31_59_nlds50.png" 
+            alt="Festa & Cia Logo" 
+            className="h-full w-full rounded-[20px] object-cover"
+          />
         </div>
         <h1 className="mb-2 text-2xl font-semibold text-stone-800">Festa &amp; Cia</h1>
         <p className="mb-8 text-sm text-stone-500">Digite seu código de acesso para entrar.</p>
@@ -50,6 +55,8 @@ export default function Login() {
             {loading ? "Entrando..." : "Acessar CRM"}
           </button>
         </form>
+
+        <InstallPWA />
       </div>
     </div>
   );

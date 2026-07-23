@@ -83,7 +83,13 @@ function Shell() {
       {/* Desktop sidebar */}
       <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col gap-1 border-r border-white/60 bg-white/40 p-5 backdrop-blur-xl lg:flex">
         <div className="mb-6 flex items-center gap-3 px-2">
-          <span className="grid h-11 w-11 place-items-center rounded-2xl bg-gradient-to-br from-nude-400 to-lilac-400 text-xl shadow-lg shadow-lilac-200">🎀</span>
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white shadow-lg shadow-lilac-200 p-0.5">
+            <img 
+              src="https://res.cloudinary.com/dmxeqe939/image/upload/v1784820761/ChatGPT_Image_23_de_jul._de_2026_12_31_59_nlds50.png" 
+              alt="Logo" 
+              className="h-full w-full rounded-[14px] object-cover"
+            />
+          </div>
           <div>
             <p className="font-semibold leading-tight text-stone-800">Festa &amp; Cia</p>
             <p className="text-[11px] text-stone-500">Código: <span className="font-bold text-stone-700">{tenantId}</span></p>
@@ -115,7 +121,13 @@ function Shell() {
         {/* Mobile header */}
         <header className="sticky top-0 z-30 flex items-center justify-between border-b border-white/60 bg-white/50 px-4 py-3 backdrop-blur-xl lg:hidden">
           <div className="flex items-center gap-2">
-            <span className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-nude-400 to-lilac-400 text-lg">🎀</span>
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white p-0.5 shadow-sm">
+              <img 
+                src="https://res.cloudinary.com/dmxeqe939/image/upload/v1784820761/ChatGPT_Image_23_de_jul._de_2026_12_31_59_nlds50.png" 
+                alt="Logo" 
+                className="h-full w-full rounded-lg object-cover"
+              />
+            </div>
             <p className="font-semibold text-stone-800">{tenantId}</p>
           </div>
           <div className="flex items-center gap-2">

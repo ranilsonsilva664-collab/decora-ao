@@ -1,0 +1,16 @@
+{
+  "name": "Festa & Cia CRM",
+  "short_name": "Festa&Cia",
+  "description": "CRM Pegue e Monte para Decoradoras",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#e8a0bf",
+  "icons": [
+    {
+      "src": "https://res.cloudinary.com/dmxeqe939/image/upload/v1784820761/ChatGPT_Image_23_de_jul._de_2026_12_31_59_nlds50.png",
+      "sizes": "any",
+      "type": "image/png"
+    }
+  ]
+}
