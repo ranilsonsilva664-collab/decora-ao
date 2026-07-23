@@ -104,9 +104,16 @@ export interface Tenant {
   createdAt: string;
 }
 
+export interface InventoryItem {
+  id: string;
+  name: string;
+  quantity: number;
+}
+
 export interface TenantData {
   clients: Client[];
   themes: PartyTheme[];
+  inventoryItems: InventoryItem[];
   quotes: Quote[];
   contracts: Contract[];
   events: CalendarEvent[];

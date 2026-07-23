@@ -27,6 +27,7 @@ const DEFAULT_CONTRACT_RULES =
 const DEFAULT_DATA: TenantData = {
   clients: [],
   themes: [],
+  inventoryItems: [],
   quotes: [],
   contracts: [],
   events: [],
@@ -44,6 +45,7 @@ interface State extends TenantData {
 
   setClients: (v: Client[]) => void;
   setThemes: (v: PartyTheme[]) => void;
+  setInventoryItems: (v: any[]) => void;
   setQuotes: (v: Quote[]) => void;
   setContracts: (v: Contract[]) => void;
   setEvents: (v: CalendarEvent[]) => void;
@@ -160,6 +162,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         logout,
         setClients: (v) => updateData("clients", v),
         setThemes: (v) => updateData("themes", v),
+        setInventoryItems: (v) => updateData("inventoryItems", v),
         setQuotes: (v) => updateData("quotes", v),
         setContracts: (v) => updateData("contracts", v),
         setEvents: (v) => updateData("events", v),
