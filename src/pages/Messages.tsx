@@ -11,7 +11,10 @@ export default function Messages() {
   const [selected, setSelected] = useState("");
 
   const client = clients.find((c) => c.id === selected);
-  const personalize = (body: string) => (client ? body.replace(/Oii/g, `Oii ${client.name.split(" ")[0]}`) : body);
+  const personalize = (body: string, targetClient?: any) => {
+    const target = targetClient || client;
+    return target ? body.replace(/Oii/g, `Oii ${target.name.split(" ")[0]}`) : body;
+  };
 
   return (
     <div className="space-y-5">
@@ -52,9 +55,29 @@ export default function Messages() {
               <div className="mt-3 flex flex-wrap gap-2">
                 <Button variant="soft" className="!px-3 !py-2 text-xs" onClick={async () => { await copy(text); toast("Mensagem copiada!"); }}><Icon.copy className="h-4 w-4" /> Copiar</Button>
                 {client?.whatsapp ? (
-                  <a href={waLink(client.whatsapp, text)} target="_blank" rel="noreferrer"><Button variant="wa" className="!px-3 !py-2 text-xs"><Icon.wa className="h-4 w-4" /> Enviar</Button></a>
+                  <a href={waLink(client.whatsapp, text)} target="_blank" rel="noreferrer"><Button variant="wa" className="!px-3 !py-2 text-xs"><Icon.wa className="h-4 w-4" /> Enviar p/ {client.name.split(' ')[0]}</Button></a>
                 ) : (
-                  <Badge color="gray">Selecione um cliente p/ enviar</Badge>
+                  <div className="relative inline-block">
+                    <select
+                      title="Selecionar cliente"
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                      onChange={(e) => {
+                        const c = clients.find(x => x.id === e.target.value);
+                        if (c?.whatsapp) {
+                          window.open(waLink(c.whatsapp, personalize(m.body, c)), "_blank");
+                        } else if (c) {
+                          toast("Este cliente não tem WhatsApp cadastrado.");
+                        }
+                        e.target.value = "";
+                      }}
+                    >
+                      <option value="">Selecione um cliente...</option>
+                      {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                    </select>
+                    <Button variant="soft" className="!px-3 !py-2 text-xs !bg-stone-200 !text-stone-600 pointer-events-none">
+                      <Icon.wa className="h-4 w-4 opacity-50" /> Escolher e Enviar
+                    </Button>
+                  </div>
                 )}
               </div>
             </Card>
