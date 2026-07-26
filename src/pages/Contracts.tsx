@@ -149,10 +149,8 @@ export default function Contracts() {
           <Field label="CPF"><Input value={c.cpf} onChange={(e) => setC({ ...c, cpf: e.target.value })} placeholder="000.000.000-00" /></Field>
           <Field label="Data da festa"><Input type="date" value={c.partyDate} onChange={(e) => setC({ ...c, partyDate: e.target.value })} /></Field>
           <Field label="Tema contratado">
-            <Select value={c.theme} onChange={(e) => setC({ ...c, theme: e.target.value })}>
-              <option value="">Selecione...</option>
-              {themes.map((t) => <option key={t.id} value={t.name}>{t.name}</option>)}
-            </Select>
+            <Input list="cthemelist" value={c.theme} onChange={(e) => setC({ ...c, theme: e.target.value })} placeholder="Nome do tema" />
+            <datalist id="cthemelist">{themes.map((t) => <option key={t.id} value={t.name} />)}</datalist>
           </Field>
           <Field label="Valor total (R$)"><Input type="number" value={c.value || ""} onChange={(e) => setC({ ...c, value: +e.target.value })} /></Field>
           <Field label="Valor do sinal (R$)"><Input type="number" value={c.deposit || ""} onChange={(e) => setC({ ...c, deposit: +e.target.value })} /></Field>

@@ -127,10 +127,8 @@ export default function Quotes() {
             <datalist id="clientlist">{clients.map((c) => <option key={c.id} value={c.name} />)}</datalist>
           </Field>
           <Field label="Tema">
-            <Select value={q.theme} onChange={(e) => setQ({ ...q, theme: e.target.value })}>
-              <option value="">Selecione...</option>
-              {themes.map((t) => <option key={t.id} value={t.name}>{t.name}</option>)}
-            </Select>
+            <Input list="qthemelist" value={q.theme} onChange={(e) => setQ({ ...q, theme: e.target.value })} placeholder="Nome do tema" />
+            <datalist id="qthemelist">{themes.map((t) => <option key={t.id} value={t.name} />)}</datalist>
           </Field>
           <div className="sm:col-span-2"><Field label="Descrição"><Textarea value={q.description} onChange={(e) => setQ({ ...q, description: e.target.value })} placeholder="Painel, mesa decorada, arco de balões..." /></Field></div>
           <Field label="Data"><Input type="date" value={q.date} onChange={(e) => setQ({ ...q, date: e.target.value })} /></Field>
