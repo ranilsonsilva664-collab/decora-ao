@@ -52,7 +52,7 @@ export function InstallPWA() {
     <div className="mt-6 flex flex-col items-center gap-3 rounded-2xl bg-white/70 p-4 text-center shadow-sm backdrop-blur-md">
       <div className="flex items-center justify-center gap-3">
         <img
-          src="https://res.cloudinary.com/dmxeqe939/image/upload/v1784820761/ChatGPT_Image_23_de_jul._de_2026_12_31_59_nlds50.png"
+          src="https://res.cloudinary.com/dmxeqe939/image/upload/v1785097595/ChatGPT_Image_26_de_jul._de_2026_17_25_48_ilxojd.png"
           alt="Logo"
           className="h-10 w-10 rounded-xl object-cover shadow-md"
         />

@@ -27,7 +27,7 @@ export default function Contracts() {
   });
 
   const contractText = (c: Contract) =>
-    `📑 *CONTRATO DE LOCAÇÃO — Festa & Cia*\n\n` +
+    `📑 *CONTRATO DE LOCAÇÃO — EventFlow*\n\n` +
     `Contratante: ${c.clientName} (CPF ${c.cpf || "—"})\n` +
     `Tema: ${c.theme} • Festa em ${fmtDate(c.partyDate)}\n` +
     `Valor total: ${brl(c.value)} • Sinal: ${brl(c.deposit)}\n` +

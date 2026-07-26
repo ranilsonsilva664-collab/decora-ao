@@ -95,7 +95,7 @@ function Shell() {
         <div className="mb-6 flex items-center gap-3 px-2">
           <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white shadow-lg shadow-lilac-200 p-0.5">
             <img 
-              src="https://res.cloudinary.com/dmxeqe939/image/upload/v1784820761/ChatGPT_Image_23_de_jul._de_2026_12_31_59_nlds50.png" 
+              src="https://res.cloudinary.com/dmxeqe939/image/upload/v1785097595/ChatGPT_Image_26_de_jul._de_2026_17_25_48_ilxojd.png" 
               alt="Logo" 
               className="h-full w-full rounded-[14px] object-cover"
             />
@@ -133,7 +133,7 @@ function Shell() {
           <div className="flex items-center gap-2">
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white p-0.5 shadow-sm">
               <img 
-                src="https://res.cloudinary.com/dmxeqe939/image/upload/v1784820761/ChatGPT_Image_23_de_jul._de_2026_12_31_59_nlds50.png" 
+                src="https://res.cloudinary.com/dmxeqe939/image/upload/v1785097595/ChatGPT_Image_26_de_jul._de_2026_17_25_48_ilxojd.png" 
                 alt="Logo" 
                 className="h-full w-full rounded-lg object-cover"
               />

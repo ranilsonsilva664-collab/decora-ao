@@ -24,7 +24,7 @@ const total = (q: Quote) => q.value + q.delivery;
 const remaining = (q: Quote) => total(q) - q.deposit;
 
 const quoteMessage = (q: Quote) =>
-  `🎀 *ORÇAMENTO — Festa & Cia*\n\n` +
+  `🎀 *ORÇAMENTO — EventFlow*\n\n` +
   `👤 Cliente: ${q.clientName || "—"}\n` +
   `🎉 Tema: ${q.theme || "—"}\n` +
   `🗓️ Data: ${fmtDate(q.date)} às ${q.time || "—"}\n\n` +

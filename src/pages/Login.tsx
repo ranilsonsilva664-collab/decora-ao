@@ -26,8 +26,8 @@ export default function Login() {
       <div className="w-full max-w-sm glass rounded-3xl p-8 text-center shadow-xl">
         <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-3xl bg-white shadow-lg shadow-lilac-200 p-1">
           <img 
-            src="https://res.cloudinary.com/dmxeqe939/image/upload/v1784820761/ChatGPT_Image_23_de_jul._de_2026_12_31_59_nlds50.png" 
-            alt="Festa & Cia Logo" 
+            src="https://res.cloudinary.com/dmxeqe939/image/upload/v1785097595/ChatGPT_Image_26_de_jul._de_2026_17_25_48_ilxojd.png" 
+            alt="EventFlow Logo" 
             className="h-full w-full rounded-[20px] object-cover"
           />
         </div>

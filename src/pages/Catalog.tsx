@@ -6,7 +6,7 @@ import { Icon } from "../components/icons";
 
 export default function Catalog({ tenantId }: { tenantId: string }) {
   const [data, setData] = useState<TenantData | null>(null);
-  const [tenantName, setTenantName] = useState("Festa & Cia");
+  const [tenantName, setTenantName] = useState("EventFlow");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -70,7 +70,7 @@ export default function Catalog({ tenantId }: { tenantId: string }) {
         <div className="mx-auto flex max-w-5xl items-center justify-center gap-3">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white p-0.5 shadow-sm">
             <img 
-              src="https://res.cloudinary.com/dmxeqe939/image/upload/v1784820761/ChatGPT_Image_23_de_jul._de_2026_12_31_59_nlds50.png" 
+              src="https://res.cloudinary.com/dmxeqe939/image/upload/v1785097595/ChatGPT_Image_26_de_jul._de_2026_17_25_48_ilxojd.png" 
               alt="Logo" 
               className="h-full w-full rounded-lg object-cover"
             />
