@@ -6,6 +6,8 @@ import { uid } from "../lib/format";
 import { useToast } from "../components/Toast";
 import { compressImage } from "../utils/image";
 import type { InventoryItem } from "../lib/types";
+import { storage } from "../lib/firebase";
+import { ref, uploadString, getDownloadURL, deleteObject } from "firebase/storage";
 
 const emptyItem = (): InventoryItem => ({ id: uid(), name: "", quantity: 1, photos: [], showInCatalog: false });
 
@@ -16,17 +18,75 @@ export default function Stock() {
   const [openItem, setOpenItem] = useState(false);
   const [item, setItem] = useState<InventoryItem>(emptyItem());
   const [uploading, setUploading] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const saveItem = () => {
+  const safeItems = inventoryItems || [];
+
+  const saveItem = async () => {
     if (!item.name.trim()) return toast("Informe o nome do item");
     if (item.quantity < 1) return toast("A quantidade deve ser maior que zero");
-    const safeItems = inventoryItems || [];
-    const exists = safeItems.some((x) => x.id === item.id);
-    setInventoryItems(exists ? safeItems.map((x) => (x.id === item.id ? item : x)) : [item, ...safeItems]);
-    setOpenItem(false);
-    toast(exists ? "Item atualizado!" : "Item adicionado!");
+    
+    setSaving(true);
+    toast("Salvando peça...");
+    try {
+      const finalPhotos: string[] = [];
+      const currentPhotos = item.photos || (item.photo ? [item.photo] : []);
+      
+      for (let i = 0; i < currentPhotos.length; i++) {
+        const p = currentPhotos[i];
+        if (p.startsWith("data:image")) {
+          // Upload to storage
+          const fileName = `tenants/${tenantId}/stock/${item.id}/${uid()}.jpg`;
+          const sRef = ref(storage, fileName);
+          await uploadString(sRef, p, "data_url");
+          const url = await getDownloadURL(sRef);
+          finalPhotos.push(url);
+        } else {
+          finalPhotos.push(p);
+        }
+      }
+      
+      // Cleanup removed photos from Firebase Storage
+      const existingItem = safeItems.find((x) => x.id === item.id);
+      if (existingItem) {
+        const oldPhotos = existingItem.photos || (existingItem.photo ? [existingItem.photo] : []);
+        for (const old of oldPhotos) {
+          if (old.includes("firebasestorage") && !finalPhotos.includes(old)) {
+            try { await deleteObject(ref(storage, old)); } catch (e) { console.error("Error deleting old photo", e); }
+          }
+        }
+      }
+
+      const finalItem = { ...item, photos: finalPhotos, photo: finalPhotos[0] || "" };
+      const exists = safeItems.some((x) => x.id === item.id);
+      setInventoryItems(exists ? safeItems.map((x) => (x.id === item.id ? finalItem : x)) : [finalItem, ...safeItems]);
+      
+      setOpenItem(false);
+      toast(exists ? "Item atualizado!" : "Item adicionado!");
+    } catch (err) {
+      console.error(err);
+      toast("Erro ao salvar imagens no banco de dados.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const deleteItem = async (id: string) => {
+    const existingItem = safeItems.find((x) => x.id === id);
+    if (existingItem) {
+      toast("Excluindo fotos e item...");
+      const oldPhotos = existingItem.photos || (existingItem.photo ? [existingItem.photo] : []);
+      for (const old of oldPhotos) {
+        if (old.includes("firebasestorage")) {
+          try { await deleteObject(ref(storage, old)); } catch (e) { console.error(e); }
+        }
+      }
+      setInventoryItems(safeItems.filter((x) => x.id !== id));
+      setOpenItem(false);
+      toast("Item removido");
+    }
   };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -45,8 +105,7 @@ export default function Stock() {
       const newPhotos: string[] = [];
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
-        // Comprime a imagem no lado do cliente
-        const base64 = await compressImage(file, 800, 0.6); 
+        const base64 = await compressImage(file, 800, 0.7); 
         newPhotos.push(base64);
       }
       setItem({ ...item, photos: [...currentPhotos, ...newPhotos] });
@@ -65,7 +124,6 @@ export default function Stock() {
     setItem({ ...item, photos: newPhotos });
   };
 
-  const safeItems = inventoryItems || [];
   const catalogUrl = `${window.location.origin}/catalog/${tenantId}`;
 
   return (
@@ -154,12 +212,12 @@ export default function Stock() {
       <Modal open={openItem} onClose={() => setOpenItem(false)} title="Peça do Estoque">
         <div className="space-y-4 mt-2">
           <Field label="Nome da peça (Ex: Arco romano, Cilindro P)">
-            <Input value={item.name} onChange={(e) => setItem({ ...item, name: e.target.value })} placeholder="Nome da peça" />
+            <Input value={item.name} onChange={(e) => setItem({ ...item, name: e.target.value })} placeholder="Nome da peça" disabled={saving} />
           </Field>
           
           <div className="grid grid-cols-2 gap-4">
             <Field label="Quantidade disponível">
-              <Input type="number" min="1" value={item.quantity || ""} onChange={(e) => setItem({ ...item, quantity: +e.target.value })} />
+              <Input type="number" min="1" value={item.quantity || ""} onChange={(e) => setItem({ ...item, quantity: +e.target.value })} disabled={saving} />
             </Field>
           </div>
 
@@ -172,6 +230,7 @@ export default function Stock() {
                 ref={fileInputRef} 
                 onChange={handleFileChange} 
                 className="hidden" 
+                disabled={saving || uploading}
               />
               
               <div className="grid grid-cols-3 gap-2">
@@ -180,7 +239,8 @@ export default function Stock() {
                     <img src={p} alt="Upload" className="h-full w-full object-cover" />
                     <button 
                       onClick={() => removePhoto(i)} 
-                      className="absolute top-1 right-1 h-6 w-6 rounded-full bg-black/50 text-white flex items-center justify-center hover:bg-red-500 transition"
+                      disabled={saving}
+                      className="absolute top-1 right-1 h-6 w-6 rounded-full bg-black/50 text-white flex items-center justify-center hover:bg-red-500 transition disabled:opacity-50"
                     >
                       &times;
                     </button>
@@ -190,7 +250,7 @@ export default function Stock() {
                 {((item.photos && item.photos.length > 0) ? item.photos : (item.photo ? [item.photo] : [])).length < 5 && (
                   <button 
                     onClick={() => fileInputRef.current?.click()} 
-                    disabled={uploading}
+                    disabled={uploading || saving}
                     className="flex aspect-square flex-col items-center justify-center rounded-xl border-2 border-dashed border-lilac-200 bg-lilac-50/50 text-lilac-500 transition hover:bg-lilac-50 disabled:opacity-50"
                   >
                     {uploading ? (
@@ -208,7 +268,7 @@ export default function Stock() {
           </Field>
           
           <label className="flex items-center gap-3 cursor-pointer p-3 rounded-xl bg-white/50 border border-white/70 hover:bg-white transition">
-            <input type="checkbox" checked={!!item.showInCatalog} onChange={(e) => setItem({ ...item, showInCatalog: e.target.checked })} className="h-5 w-5 rounded border-stone-300 text-lilac-500 focus:ring-lilac-400" />
+            <input type="checkbox" checked={!!item.showInCatalog} onChange={(e) => setItem({ ...item, showInCatalog: e.target.checked })} disabled={saving} className="h-5 w-5 rounded border-stone-300 text-lilac-500 focus:ring-lilac-400" />
             <div className="flex-1">
               <span className="font-semibold text-stone-700 block">Mostrar no Catálogo</span>
               <span className="text-[11px] text-stone-500 leading-tight">Ative para que o cliente veja esta peça no seu link do catálogo público.</span>
@@ -217,10 +277,10 @@ export default function Stock() {
         </div>
         <div className="mt-6 flex gap-3">
           {safeItems.some((x) => x.id === item.id) && (
-            <Button variant="soft" className="!text-rose-500" onClick={() => { setInventoryItems(safeItems.filter((x) => x.id !== item.id)); setOpenItem(false); toast("Item removido"); }}>Excluir</Button>
+            <Button variant="soft" className="!text-rose-500" disabled={saving} onClick={() => deleteItem(item.id)}>Excluir</Button>
           )}
-          <Button variant="ghost" onClick={() => setOpenItem(false)} className="ml-auto">Cancelar</Button>
-          <Button onClick={saveItem}>Salvar peça</Button>
+          <Button variant="ghost" onClick={() => setOpenItem(false)} disabled={saving} className="ml-auto">Cancelar</Button>
+          <Button onClick={saveItem} disabled={saving}>{saving ? "Salvando..." : "Salvar peça"}</Button>
         </div>
       </Modal>
     </div>
