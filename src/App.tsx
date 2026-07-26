@@ -101,7 +101,7 @@ function Shell() {
             />
           </div>
           <div>
-            <p className="font-semibold leading-tight text-stone-800">Festa &amp; Cia</p>
+            <p className="font-semibold leading-tight text-stone-800">EventFlow</p>
             <p className="text-[11px] text-stone-500">Código: <span className="font-bold text-stone-700">{tenantId}</span></p>
           </div>
         </div>

@@ -31,7 +31,7 @@ export default function Login() {
             className="h-full w-full rounded-[20px] object-cover"
           />
         </div>
-        <h1 className="mb-2 text-2xl font-semibold text-stone-800">Festa &amp; Cia</h1>
+        <h1 className="mb-2 text-2xl font-semibold text-stone-800">EventFlow</h1>
         <p className="mb-8 text-sm text-stone-500">Digite seu código de acesso para entrar.</p>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">

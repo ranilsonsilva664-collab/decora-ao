@@ -63,7 +63,7 @@ export default function Quotes() {
       h1{color:#a98fe0}.box{border:1px solid #eee;border-radius:18px;padding:24px;max-width:600px;margin:auto;box-shadow:0 8px 30px -12px rgba(169,143,224,.4)}
       .row{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px dashed #eee}
       .tot{font-size:20px;font-weight:700;color:#c9a45c}</style></head><body>
-      <div class="box"><h1>🎀 Festa &amp; Cia</h1><p>Decoração Pegue e Monte</p><hr/>
+      <div class="box"><h1>🎀 EventFlow</h1><p>Decoração Pegue e Monte</p><hr/>
       <p><b>Cliente:</b> ${item.clientName}</p>
       <p><b>Tema:</b> ${item.theme} &nbsp; <b>Data:</b> ${fmtDate(item.date)} ${item.time}</p>
       <p>${item.description}</p>

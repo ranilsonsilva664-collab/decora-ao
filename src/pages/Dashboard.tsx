@@ -91,7 +91,7 @@ export default function Dashboard({ go }: { go: (p: Page) => void }) {
       <div className="animate-fade">
         <p className="text-sm font-medium text-lilac-400">Bem-vinda de volta ✨</p>
         <h1 className="text-2xl font-semibold tracking-tight text-stone-800 sm:text-3xl">
-          Painel da <span className="text-gradient">Festa &amp; Cia</span>
+          Painel do <span className="text-gradient">EventFlow</span>
         </h1>
         <p className="mt-1 text-sm text-stone-500">Sua decoração Pegue e Monte organizada num só lugar.</p>
       </div>
