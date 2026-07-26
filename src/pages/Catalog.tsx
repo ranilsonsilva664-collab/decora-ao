@@ -6,6 +6,7 @@ import { Icon } from "../components/icons";
 
 export default function Catalog({ tenantId }: { tenantId: string }) {
   const [data, setData] = useState<TenantData | null>(null);
+  const [tenantName, setTenantName] = useState("Festa & Cia");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -13,6 +14,12 @@ export default function Catalog({ tenantId }: { tenantId: string }) {
     async function load() {
       try {
         const snap = await getDoc(doc(db, "tenant_data", tenantId));
+        const tSnap = await getDoc(doc(db, "tenants", tenantId));
+        
+        if (tSnap.exists()) {
+          setTenantName(tSnap.data().name);
+        }
+
         if (snap.exists()) {
           const tenantData = snap.data() as TenantData;
           if (tenantData.catalogEnabled) {
@@ -69,7 +76,7 @@ export default function Catalog({ tenantId }: { tenantId: string }) {
             />
           </div>
           <div>
-            <h1 className="font-bold text-stone-800 leading-tight">Festa &amp; Cia</h1>
+            <h1 className="font-bold text-stone-800 leading-tight">{tenantName}</h1>
             <p className="text-[11px] font-medium text-lilac-500">Catálogo de Peças Avulsas</p>
           </div>
         </div>

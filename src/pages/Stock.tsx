@@ -16,6 +16,7 @@ export default function Stock() {
   const [openItem, setOpenItem] = useState(false);
   const [item, setItem] = useState<InventoryItem>(emptyItem());
   const [uploading, setUploading] = useState(false);
+  const [search, setSearch] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const saveItem = () => {
@@ -75,6 +76,16 @@ export default function Stock() {
         action={<Button onClick={() => { setItem(emptyItem()); setOpenItem(true); }}><Icon.plus className="h-4 w-4" /> Nova peça</Button>}
       />
 
+      <div className="relative mb-2">
+        <Icon.dashboard className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-stone-400" />
+        <Input 
+          className="pl-10 !bg-white !border-white/60 shadow-sm"
+          placeholder="Buscar peça no estoque..." 
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+        />
+      </div>
+
       <Card className="bg-gradient-to-br from-lilac-50 to-nude-50 border-lilac-200">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
@@ -102,7 +113,7 @@ export default function Stock() {
       </Card>
 
       <div className="grid gap-4 sm:grid-cols-3 xl:grid-cols-4">
-        {safeItems.map((it) => {
+        {safeItems.filter(it => it.name.toLowerCase().includes(search.toLowerCase())).map((it) => {
           const mainPhoto = (it.photos && it.photos.length > 0) ? it.photos[0] : it.photo;
           return (
             <Card key={it.id} className="animate-rise flex flex-col p-4 relative overflow-hidden group">
@@ -135,8 +146,8 @@ export default function Stock() {
             </Card>
           );
         })}
-        {safeItems.length === 0 && (
-          <div className="col-span-full py-12 text-center text-stone-500">Nenhum item avulso cadastrado. (Ex: Cilindros, Arcos, etc)</div>
+        {safeItems.filter(it => it.name.toLowerCase().includes(search.toLowerCase())).length === 0 && (
+          <div className="col-span-full py-12 text-center text-stone-500">Nenhum item encontrado.</div>
         )}
       </div>
 
