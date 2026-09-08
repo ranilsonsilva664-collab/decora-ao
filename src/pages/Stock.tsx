@@ -127,7 +127,8 @@ export default function Stock() {
   // Save Item
   const saveItem = async () => {
     if (!item.name.trim()) return toast("Informe o nome da peça");
-    if (item.quantity < 1) return toast("A quantidade total deve ser no mínimo 1");
+    const totalQty = Math.max(1, Number(item.quantity) || 1);
+    if (totalQty < 1) return toast("A quantidade total deve ser no mínimo 1");
 
     setSaving(true);
     toast("Salvando peça no acervo...");
@@ -165,6 +166,12 @@ export default function Stock() {
 
       const finalItem: InventoryItem = {
         ...item,
+        quantity: totalQty,
+        inMaintenance: Math.max(0, Number(item.inMaintenance) || 0),
+        damaged: Math.max(0, Number(item.damaged) || 0),
+        lost: Math.max(0, Number(item.lost) || 0),
+        rentalPrice: Math.max(0, Number(item.rentalPrice) || 0),
+        replacementPrice: Math.max(0, Number(item.replacementPrice) || 0),
         code: item.code || generateItemCode(safeItems.length),
         category: item.category || "Outros",
         photos: finalPhotos,
@@ -922,12 +929,22 @@ export default function Stock() {
               Controle de Quantidade
             </p>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <Field label="Quantidade TOTAL">
+              <Field label="Quantidade TOTAL *">
                 <Input
                   type="number"
                   min="1"
-                  value={item.quantity || ""}
-                  onChange={(e) => setItem({ ...item, quantity: Math.max(1, +e.target.value) })}
+                  value={item.quantity === 0 || (item.quantity as any) === "" ? "" : item.quantity}
+                  placeholder="1"
+                  onFocus={(e) => e.target.select()}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setItem({ ...item, quantity: val === "" ? ("" as any) : Number(val) });
+                  }}
+                  onBlur={() => {
+                    if (!item.quantity || Number(item.quantity) < 1) {
+                      setItem({ ...item, quantity: 1 });
+                    }
+                  }}
                   disabled={saving}
                   className="font-bold text-stone-800"
                 />
@@ -936,8 +953,13 @@ export default function Stock() {
                 <Input
                   type="number"
                   min="0"
-                  value={item.inMaintenance || 0}
-                  onChange={(e) => setItem({ ...item, inMaintenance: Math.max(0, +e.target.value) })}
+                  value={!item.inMaintenance ? "" : item.inMaintenance}
+                  placeholder="0"
+                  onFocus={(e) => e.target.select()}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setItem({ ...item, inMaintenance: val === "" ? 0 : Number(val) });
+                  }}
                   disabled={saving}
                   className="text-amber-600"
                 />
@@ -946,8 +968,13 @@ export default function Stock() {
                 <Input
                   type="number"
                   min="0"
-                  value={item.damaged || 0}
-                  onChange={(e) => setItem({ ...item, damaged: Math.max(0, +e.target.value) })}
+                  value={!item.damaged ? "" : item.damaged}
+                  placeholder="0"
+                  onFocus={(e) => e.target.select()}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setItem({ ...item, damaged: val === "" ? 0 : Number(val) });
+                  }}
                   disabled={saving}
                   className="text-rose-500"
                 />
@@ -956,8 +983,13 @@ export default function Stock() {
                 <Input
                   type="number"
                   min="0"
-                  value={item.lost || 0}
-                  onChange={(e) => setItem({ ...item, lost: Math.max(0, +e.target.value) })}
+                  value={!item.lost ? "" : item.lost}
+                  placeholder="0"
+                  onFocus={(e) => e.target.select()}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setItem({ ...item, lost: val === "" ? 0 : Number(val) });
+                  }}
                   disabled={saving}
                   className="text-stone-500"
                 />
@@ -974,9 +1006,14 @@ export default function Stock() {
               <Input
                 type="number"
                 step="0.01"
-                value={item.rentalPrice || ""}
-                onChange={(e) => setItem({ ...item, rentalPrice: +e.target.value })}
+                min="0"
+                value={!item.rentalPrice ? "" : item.rentalPrice}
                 placeholder="0.00"
+                onFocus={(e) => e.target.select()}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setItem({ ...item, rentalPrice: val === "" ? ("" as any) : Number(val) });
+                }}
                 disabled={saving}
               />
             </Field>
@@ -984,9 +1021,14 @@ export default function Stock() {
               <Input
                 type="number"
                 step="0.01"
-                value={item.replacementPrice || ""}
-                onChange={(e) => setItem({ ...item, replacementPrice: +e.target.value })}
+                min="0"
+                value={!item.replacementPrice ? "" : item.replacementPrice}
                 placeholder="0.00"
+                onFocus={(e) => e.target.select()}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setItem({ ...item, replacementPrice: val === "" ? ("" as any) : Number(val) });
+                }}
                 disabled={saving}
               />
             </Field>
@@ -1163,9 +1205,16 @@ export default function Stock() {
                 <Input
                   type="number"
                   min="1"
-                  value={selectedCompQty}
-                  onChange={(e) => setSelectedCompQty(Math.max(1, +e.target.value))}
-                  placeholder="Qtd"
+                  value={selectedCompQty === 0 || (selectedCompQty as any) === "" ? "" : selectedCompQty}
+                  placeholder="1"
+                  onFocus={(e) => e.target.select()}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setSelectedCompQty(val === "" ? ("" as any) : Number(val));
+                  }}
+                  onBlur={() => {
+                    if (!selectedCompQty || Number(selectedCompQty) < 1) setSelectedCompQty(1);
+                  }}
                   className="!bg-white"
                 />
               </div>

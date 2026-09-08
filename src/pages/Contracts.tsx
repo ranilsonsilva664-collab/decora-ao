@@ -6,6 +6,7 @@ import { brl, fmtDate, uid } from "../lib/format";
 import { copy, waLink } from "../lib/helpers";
 import { useToast } from "../components/Toast";
 import type { Contract, ContractStatus } from "../lib/types";
+import { downloadContractPdf } from "../utils/contractPdf";
 
 export default function Contracts() {
   const {
@@ -22,6 +23,10 @@ export default function Contracts() {
 
   const toast = useToast();
   const [open, setOpen] = useState(false);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [shareContract, setShareContract] = useState<Contract | null>(null);
+  const [sharePhone, setSharePhone] = useState("");
+  const [shareMessage, setShareMessage] = useState("");
 
   const emptyContract = (): Contract => ({
     id: uid(),
@@ -119,6 +124,15 @@ export default function Contracts() {
     if (!sigName.trim() && signOpen) return toast("Digite o nome completo para assinar");
     if (!signOpen) return;
 
+    let signatureImg = "";
+    if (canvasRef.current) {
+      try {
+        signatureImg = canvasRef.current.toDataURL("image/png");
+      } catch (e) {
+        console.error("Erro ao converter assinatura:", e);
+      }
+    }
+
     setContracts(
       contracts.map((x) =>
         x.id === signOpen.id
@@ -126,6 +140,7 @@ export default function Contracts() {
               ...x,
               signed: true,
               signature: sigName.trim(),
+              signatureImage: signatureImg,
               signedAt: new Date().toISOString(),
               status: "Assinado" as ContractStatus,
             }
@@ -138,154 +153,47 @@ export default function Contracts() {
     toast("Contrato assinado digitalmente! ✍️");
   };
 
-  // REQUISITO 23: GERAR PDF PROFISSIONAL DE CONTRATO
-  const generateContractPdf = (item: Contract) => {
-    const w = window.open("", "_blank");
-    if (!w) return;
+  // REQUISITO: BAIXAR PDF PROFISSIONAL DE CONTRATO (DIRETO NO DISPOSITIVO)
+  const handleDownloadPdf = async (item: Contract) => {
+    try {
+      setDownloadingId(item.id);
+      toast("Gerando arquivo PDF...");
+      await downloadContractPdf({
+        contract: item,
+        companySettings,
+        contractRules,
+        tenantId,
+        onProgress: (status) => toast(status),
+      });
+      toast("PDF baixado com sucesso! 📄");
+    } catch (err) {
+      console.error("Erro ao baixar PDF:", err);
+      toast("Erro ao gerar PDF do contrato.");
+    } finally {
+      setDownloadingId(null);
+    }
+  };
 
-    const logo = companySettings.logo || "";
-    const compName = companySettings.name || "RAYDECOR Pegue e Monte";
+  // REQUISITO: ENVIAR LINK PARA O CLIENTE ASSINAR DIGITALMENTE
+  const openShareModal = (item: Contract) => {
+    const client = clients.find(
+      (cl) => cl.name.toLowerCase() === item.clientName.toLowerCase()
+    );
     const signUrl = getSignLink(item.id);
-
-    w.document.write(`
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="utf-8">
-        <title>Contrato — ${item.clientName}</title>
-        <style>
-          * { box-sizing: border-box; margin: 0; padding: 0; }
-          body { font-family: 'Poppins', Arial, sans-serif; padding: 30px; color: #222; background: #fff; font-size: 12px; line-height: 1.6; }
-          .container { max-width: 760px; margin: 0 auto; border: 1px solid #fae8ff; border-radius: 20px; padding: 40px; box-shadow: 0 10px 30px rgba(217, 70, 239, 0.08); }
-          .header { display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid #fae8ff; padding-bottom: 20px; margin-bottom: 25px; }
-          .logo { height: 64px; width: 64px; object-fit: cover; border-radius: 14px; border: 1px solid #fce7f3; }
-          .brand h1 { font-size: 20px; color: #ec4899; font-weight: 700; }
-          .brand p { font-size: 11px; color: #777; }
-          .badge { background: #fdf2f8; color: #db2777; padding: 6px 14px; border-radius: 999px; font-weight: 700; font-size: 11px; text-transform: uppercase; }
-          .section { margin-bottom: 20px; }
-          .section-title { font-size: 12px; font-weight: 700; color: #a855f7; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; border-left: 3px solid #ec4899; padding-left: 8px; }
-          .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; background: #faf8fd; padding: 14px; border-radius: 14px; }
-          .grid-item b { color: #444; }
-          table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-          th { text-align: left; background: #fdf2f8; color: #db2777; padding: 8px 10px; font-size: 11px; font-weight: 600; border-radius: 6px; }
-          td { padding: 8px 10px; border-bottom: 1px solid #f5f5f5; font-size: 11px; }
-          .terms-box { background: #faf8fd; border: 1px solid #f3e8ff; padding: 15px; border-radius: 14px; font-size: 11px; color: #555; white-space: pre-line; line-height: 1.6; }
-          .signatures { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin-top: 40px; padding-top: 20px; }
-          .sig-box { text-align: center; border-top: 1px solid #ccc; padding-top: 10px; }
-          .sig-stamp { display: inline-block; background: #ecfdf5; border: 1px solid #a7f3d0; color: #047857; padding: 6px 16px; border-radius: 12px; font-size: 11px; font-weight: 600; margin-bottom: 10px; }
-          @media print { body { padding: 0; } .container { border: none; box-shadow: none; } }
-        </style>
-      </head>
-      <body>
-        <div class="container">
-          <div class="header">
-            <div style="display:flex; align-items:center; gap:15px;">
-              ${logo ? `<img src="${logo}" class="logo" alt="Logo">` : ""}
-              <div class="brand">
-                <h1>${compName}</h1>
-                <p>Instrumento Particular de Locação de Bens Móveis Pegue e Monte</p>
-                ${companySettings.cnpjCpf ? `<p>CNPJ/CPF: ${companySettings.cnpjCpf}</p>` : ""}
-              </div>
-            </div>
-            <div class="badge">Contrato #${item.id.slice(0, 6).toUpperCase()}</div>
-          </div>
-
-          <div class="section">
-            <div class="section-title">1. Partes Contratantes</div>
-            <div class="grid">
-              <div class="grid-item"><b>LOCADORA:</b> ${compName}</div>
-              <div class="grid-item"><b>RESPONSÁVEL:</b> ${companySettings.ownerName || "A Gerência"}</div>
-              <div class="grid-item"><b>LOCATÁRIA:</b> ${item.clientName}</div>
-              <div class="grid-item"><b>CPF DA CLIENTE:</b> ${item.cpf || "Não informado"}</div>
-            </div>
-          </div>
-
-          <div class="section">
-            <div class="section-title">2. Objeto e Cronograma da Locação</div>
-            <div class="grid">
-              <div class="grid-item"><b>Tema Contratado:</b> ${item.theme}</div>
-              <div class="grid-item"><b>Data do Evento:</b> ${fmtDate(item.partyDate)}</div>
-              <div class="grid-item"><b>Data de Retirada:</b> ${fmtDate(item.pickupDate || item.partyDate)} às ${item.pickupTime || "09:00"}</div>
-              <div class="grid-item"><b>Data de Devolução:</b> ${fmtDate(item.returnDate || item.partyDate)} às ${item.returnTime || "12:00"}</div>
-            </div>
-
-            ${
-              item.items && item.items.length > 0
-                ? `
-              <table style="margin-top:15px;">
-                <thead>
-                  <tr>
-                    <th>Peça / Material Alugado</th>
-                    <th style="text-align:center;">Qtd</th>
-                    <th style="text-align:right;">Valor</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  ${item.items
-                    .map(
-                      (it) => `
-                    <tr>
-                      <td><b>${it.name}</b></td>
-                      <td style="text-align:center;">${it.quantity}x</td>
-                      <td style="text-align:right;">${brl(it.subtotal)}</td>
-                    </tr>
-                  `
-                    )
-                    .join("")}
-                </tbody>
-              </table>
-            `
-                : ""
-            }
-          </div>
-
-          <div class="section">
-            <div class="section-title">3. Valores e Condições de Pagamento</div>
-            <div class="grid">
-              <div class="grid-item"><b>Valor Total da Locação:</b> ${brl(item.value)}</div>
-              <div class="grid-item"><b>Sinal Pago (Reserva):</b> ${brl(item.deposit)}</div>
-              <div class="grid-item"><b>Saldo Restante na Retirada:</b> ${brl(item.value - item.deposit)}</div>
-              <div class="grid-item"><b>Forma de Pagamento:</b> Pix / Dinheiro / Cartão</div>
-            </div>
-          </div>
-
-          <div class="section">
-            <div class="section-title">4. Cláusulas e Termos de Uso e Conservação</div>
-            <div class="terms-box">
-              ${item.customTerms || companySettings.terms || contractRules}
-            </div>
-          </div>
-
-          <div class="signatures">
-            <div class="sig-box">
-              <p><b>${compName}</b></p>
-              <p style="font-size:10px; color:#888;">Locadora</p>
-            </div>
-            <div class="sig-box">
-              ${
-                item.signed
-                  ? `
-                <div class="sig-stamp">✓ ASSINADO DIGITALMENTE</div>
-                <p><b>${item.signature}</b></p>
-                <p style="font-size:10px; color:#666;">Data: ${
-                  item.signedAt ? fmtDate(item.signedAt) : "Confirmado"
-                }</p>
-              `
-                  : `
-                <p style="margin-top:20px;">_________________________________________</p>
-                <p><b>${item.clientName}</b></p>
-                <p style="font-size:10px; color:#888;">Locatária</p>
-              `
-              }
-            </div>
-          </div>
-        </div>
-        <script>window.print()</script>
-      </body>
-      </html>
-    `);
-    w.document.close();
-    toast("Gerando PDF do contrato...");
+    const phone = client?.whatsapp || "";
+    setSharePhone(phone);
+    setShareContract(item);
+    setShareMessage(
+      `Olá, ${item.clientName}! 💕\n` +
+      `Aqui é da equipe da ${companySettings.tradeName || "RAYDECOR Pegue e Monte"}.\n\n` +
+      `Já preparamos o seu *Contrato de Locação* para o evento no dia *${fmtDate(item.partyDate)}* (Tema: ${item.theme})! 🎉\n\n` +
+      `💰 *Valor Total:* ${brl(item.value)}\n` +
+      `💳 *Sinal (Reserva):* ${brl(item.deposit)}\n` +
+      `📌 *Saldo Restante na Retirada:* ${brl(item.value - item.deposit)}\n\n` +
+      `✍️ *Para conferir os detalhes e assinar com o dedo direto pelo celular, clique no link seguro:*\n` +
+      `${signUrl}\n\n` +
+      `Qualquer dúvida estamos à disposição! ✨`
+    );
   };
 
   return (
@@ -346,15 +254,46 @@ export default function Contracts() {
                 </div>
 
                 {item.signed && (
-                  <div className="mt-3 rounded-2xl bg-emerald-50/80 p-2.5 text-center text-xs text-emerald-700 border border-emerald-100">
-                    ✓ Assinado digitalmente por <b>{item.signature}</b>{" "}
-                    {item.signedAt ? `(${fmtDate(item.signedAt)})` : ""}
+                  <div className="mt-3 rounded-2xl bg-emerald-50/90 p-3 text-xs text-emerald-800 border border-emerald-200 flex items-center justify-between gap-3">
+                    <div>
+                      <p className="font-bold flex items-center gap-1.5 text-emerald-700">
+                        <span>✓</span> Assinado Digitalmente
+                      </p>
+                      <p className="text-[11px] text-emerald-600 mt-0.5">
+                        Por <b>{item.signature}</b> {item.signedAt ? `em ${fmtDate(item.signedAt)}` : ""}
+                      </p>
+                    </div>
+                    {item.signatureImage && (
+                      <div className="rounded-xl bg-white p-1 border border-emerald-100 shadow-sm shrink-0">
+                        <img src={item.signatureImage} alt="Assinatura" className="h-8 max-w-[110px] object-contain" />
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
 
               {/* Actions */}
               <div className="mt-4 pt-3 border-t border-stone-100 flex flex-wrap items-center gap-2">
+                {/* Botão Baixar PDF DIRETO */}
+                <Button
+                  variant="gold"
+                  disabled={downloadingId === item.id}
+                  className="!px-3.5 !py-1.5 text-xs shadow-sm shadow-amber-200/50"
+                  onClick={() => handleDownloadPdf(item)}
+                >
+                  <Icon.pdf className="h-4 w-4" />
+                  {downloadingId === item.id ? "Baixando..." : "Baixar PDF"}
+                </Button>
+
+                {/* Botão Enviar p/ Cliente Assinar pelo WhatsApp */}
+                <Button
+                  variant="wa"
+                  className="!px-3.5 !py-1.5 text-xs shadow-sm shadow-emerald-200/50"
+                  onClick={() => openShareModal(item)}
+                >
+                  <Icon.wa className="h-4 w-4" /> Enviar p/ Assinar
+                </Button>
+
                 {!item.signed && (
                   <Button
                     className="!px-3 !py-1.5 text-xs"
@@ -367,43 +306,12 @@ export default function Contracts() {
                   </Button>
                 )}
 
-                <Button
-                  variant="gold"
-                  className="!px-3 !py-1.5 text-xs"
-                  onClick={() => generateContractPdf(item)}
-                >
-                  <Icon.pdf className="h-4 w-4" /> Gerar PDF
-                </Button>
-
-                {client?.whatsapp && (
-                  <a
-                    href={waLink(client.whatsapp, contractText(item))}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    <Button variant="wa" className="!px-3 !py-1.5 text-xs">
-                      <Icon.wa className="h-4 w-4" /> WhatsApp
-                    </Button>
-                  </a>
-                )}
-
-                <Button
-                  variant="soft"
-                  className="!px-3 !py-1.5 text-xs"
-                  onClick={async () => {
-                    await copy(signUrl);
-                    toast("Link de assinatura copiado!");
-                  }}
-                >
-                  <Icon.copy className="h-4 w-4" /> Link Assinatura
-                </Button>
-
                 <button
                   onClick={() => {
                     setC(item);
                     setOpen(true);
                   }}
-                  className="ml-auto rounded-xl bg-white/70 px-3 py-1.5 text-xs font-semibold text-stone-600 hover:bg-white"
+                  className="ml-auto rounded-xl bg-white/80 px-3 py-1.5 text-xs font-semibold text-stone-600 hover:bg-white shadow-sm"
                 >
                   Editar
                 </button>
@@ -519,16 +427,28 @@ export default function Contracts() {
               <Input
                 type="number"
                 step="0.01"
-                value={c.value || ""}
-                onChange={(e) => setC({ ...c, value: +e.target.value })}
+                min="0"
+                value={c.value === 0 || (c.value as any) === "" ? "" : c.value}
+                placeholder="0.00"
+                onFocus={(e) => e.target.select()}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setC({ ...c, value: val === "" ? ("" as any) : Number(val) });
+                }}
               />
             </Field>
             <Field label="Valor do Sinal (R$)">
               <Input
                 type="number"
                 step="0.01"
-                value={c.deposit || ""}
-                onChange={(e) => setC({ ...c, deposit: +e.target.value })}
+                min="0"
+                value={c.deposit === 0 || (c.deposit as any) === "" ? "" : c.deposit}
+                placeholder="0.00"
+                onFocus={(e) => e.target.select()}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setC({ ...c, deposit: val === "" ? ("" as any) : Number(val) });
+                }}
               />
             </Field>
           </div>
@@ -600,6 +520,96 @@ export default function Contracts() {
           </Button>
           <Button onClick={confirmSign}>Confirmar Assinatura</Button>
         </div>
+      </Modal>
+
+      {/* MODAL: ENVIAR LINK PARA O CLIENTE ASSINAR */}
+      <Modal
+        open={!!shareContract}
+        onClose={() => setShareContract(null)}
+        title="Enviar Contrato para Assinatura Digital"
+      >
+        {shareContract && (
+          <div className="space-y-4">
+            <div className="rounded-2xl bg-gradient-to-br from-pink-50 to-purple-50 p-4 border border-pink-100 text-xs">
+              <p className="text-stone-800 font-bold text-sm mb-1">{shareContract.clientName}</p>
+              <p className="text-stone-600">
+                Tema: <b>{shareContract.theme}</b> • Data da Festa: <b>{fmtDate(shareContract.partyDate)}</b>
+              </p>
+              <p className="text-stone-600">
+                Valor Total: <b>{brl(shareContract.value)}</b> (Sinal: {brl(shareContract.deposit)})
+              </p>
+            </div>
+
+            <Field label="WhatsApp da Cliente (com DDD)">
+              <Input
+                value={sharePhone}
+                onChange={(e) => setSharePhone(e.target.value)}
+                placeholder="(00) 00000-0000"
+              />
+            </Field>
+
+            <Field label="Link de Assinatura Online">
+              <div className="flex gap-2">
+                <Input
+                  readOnly
+                  value={getSignLink(shareContract.id)}
+                  className="!bg-stone-50 text-xs font-mono"
+                />
+                <Button
+                  variant="soft"
+                  onClick={async () => {
+                    await copy(getSignLink(shareContract.id));
+                    toast("Link copiado com sucesso! 📋");
+                  }}
+                >
+                  Copiar
+                </Button>
+              </div>
+            </Field>
+
+            <Field label="Mensagem Pronta para o WhatsApp da Cliente">
+              <textarea
+                rows={7}
+                value={shareMessage}
+                onChange={(e) => setShareMessage(e.target.value)}
+                className="w-full rounded-2xl border border-stone-200 bg-white p-3 text-xs text-stone-700 outline-none focus:ring-2 focus:ring-pink-300 font-sans leading-relaxed"
+              />
+            </Field>
+
+            <div className="pt-2 flex flex-col sm:flex-row gap-2.5">
+              <a
+                href={waLink(sharePhone, shareMessage)}
+                target="_blank"
+                rel="noreferrer"
+                className="flex-1"
+              >
+                <Button variant="wa" className="w-full !py-3 text-xs font-bold justify-center">
+                  <Icon.wa className="h-4 w-4" /> Abrir no WhatsApp da Cliente
+                </Button>
+              </a>
+
+              <Button
+                variant="gold"
+                disabled={downloadingId === shareContract.id}
+                className="!py-3 text-xs justify-center"
+                onClick={() => handleDownloadPdf(shareContract)}
+              >
+                <Icon.pdf className="h-4 w-4" /> Baixar PDF
+              </Button>
+
+              <a
+                href={getSignLink(shareContract.id)}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-block"
+              >
+                <Button variant="ghost" className="w-full !py-3 text-xs justify-center">
+                  👁️ Testar Link
+                </Button>
+              </a>
+            </div>
+          </div>
+        )}
       </Modal>
     </div>
   );

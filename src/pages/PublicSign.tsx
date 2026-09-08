@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from "react";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { db } from "../lib/firebase";
-import type { TenantData, Contract } from "../lib/types";
+import type { TenantData, Contract, CompanySettings } from "../lib/types";
 import { brl, fmtDate } from "../lib/format";
+import { downloadContractPdf } from "../utils/contractPdf";
 
 export default function PublicSign({
   tenantId,
@@ -12,6 +13,7 @@ export default function PublicSign({
   contractId: string;
 }) {
   const [contract, setContract] = useState<Contract | null>(null);
+  const [companySettings, setCompanySettings] = useState<Partial<CompanySettings>>({});
   const [companyName, setCompanyName] = useState("RAYDECOR Pegue e Monte");
   const [companyLogo, setCompanyLogo] = useState(
     "https://res.cloudinary.com/dmxeqe939/image/upload/v1785097595/ChatGPT_Image_26_de_jul._de_2026_17_25_48_ilxojd.png"
@@ -20,6 +22,7 @@ export default function PublicSign({
   const [signerName, setSignerName] = useState("");
   const [saving, setSaving] = useState(false);
   const [signedSuccess, setSignedSuccess] = useState(false);
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const drawing = useRef(false);
@@ -31,7 +34,10 @@ export default function PublicSign({
         if (snap.exists()) {
           const tData = snap.data() as Partial<TenantData>;
           if (tData.companySettings) {
-            if (tData.companySettings.name) setCompanyName(tData.companySettings.name);
+            setCompanySettings(tData.companySettings);
+            if (tData.companySettings.name || tData.companySettings.tradeName) {
+              setCompanyName(tData.companySettings.tradeName || tData.companySettings.name || "RAYDECOR Pegue e Monte");
+            }
             if (tData.companySettings.logo) setCompanyLogo(tData.companySettings.logo);
           }
           const found = (tData.contracts || []).find((c) => c.id === contractId);
@@ -100,16 +106,30 @@ export default function PublicSign({
       const tData = snap.data() as Partial<TenantData>;
       const existingContracts = tData.contracts || [];
 
+      let signatureImg = "";
+      if (canvasRef.current) {
+        try {
+          signatureImg = canvasRef.current.toDataURL("image/png");
+        } catch (e) {
+          console.error("Erro ao converter assinatura:", e);
+        }
+      }
+
+      let updatedTargetContract: Contract | null = null;
+
       const updatedContracts = existingContracts.map((c) => {
         if (c.id === contractId) {
-          return {
+          const updated: Contract = {
             ...c,
             signed: true,
             signature: signerName.trim(),
+            signatureImage: signatureImg || c.signatureImage,
             signedAt: new Date().toISOString(),
             status: "Assinado" as const,
             signerIp: window.navigator.userAgent,
           };
+          updatedTargetContract = updated;
+          return updated;
         }
         return c;
       });
@@ -131,6 +151,9 @@ export default function PublicSign({
         { merge: true }
       );
 
+      if (updatedTargetContract) {
+        setContract(updatedTargetContract);
+      }
       setSignedSuccess(true);
     } catch (err) {
       console.error(err);
@@ -186,8 +209,46 @@ export default function PublicSign({
               Obrigado, <b>{signerName || contract.signature}</b>! Sua assinatura digital foi
               registrada e o contrato está confirmado.
             </p>
-            <div className="rounded-2xl bg-pink-50 p-4 text-xs text-pink-700">
+            <div className="rounded-2xl bg-pink-50 p-4 text-xs text-pink-700 font-medium">
               Sua decoração está 100% garantida para a data <b>{fmtDate(contract.partyDate)}</b> 💕
+            </div>
+
+            <div className="pt-2 flex flex-col gap-2.5">
+              <button
+                type="button"
+                disabled={downloadingPdf}
+                onClick={async () => {
+                  try {
+                    setDownloadingPdf(true);
+                    await downloadContractPdf({
+                      contract,
+                      companySettings,
+                      tenantId,
+                    });
+                  } catch (e) {
+                    console.error(e);
+                    alert("Erro ao baixar PDF. Tente novamente.");
+                  } finally {
+                    setDownloadingPdf(false);
+                  }
+                }}
+                className="w-full rounded-2xl bg-gradient-to-r from-pink-500 via-rose-500 to-purple-600 py-3.5 text-sm font-bold text-white shadow-lg shadow-pink-200 hover:opacity-95 transition disabled:opacity-50"
+              >
+                {downloadingPdf ? "Gerando PDF..." : "📥 Baixar Minha Cópia do Contrato (PDF)"}
+              </button>
+
+              {companySettings?.phone && (
+                <a
+                  href={`https://wa.me/55${companySettings.phone.replace(/\D/g, "")}?text=${encodeURIComponent(
+                    `Olá! Acabei de assinar digitalmente o contrato da minha festa (${contract.theme}). Muito obrigada!`
+                  )}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="w-full rounded-2xl bg-emerald-500 py-3.5 text-sm font-bold text-white shadow-lg shadow-emerald-200 hover:bg-emerald-600 inline-block text-center transition"
+                >
+                  💬 Avisar no WhatsApp da Empresa
+                </a>
+              )}
             </div>
           </div>
         ) : (

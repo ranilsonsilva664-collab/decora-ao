@@ -227,6 +227,7 @@ export interface Contract {
   returnTime?: string;
   signed: boolean;
   signature: string;
+  signatureImage?: string;
   signedAt?: string;
   signerIp?: string;
   status?: ContractStatus;
