@@ -7,6 +7,7 @@ import { copy, waLink } from "../lib/helpers";
 import { useToast } from "../components/Toast";
 import type { Contract, ContractStatus } from "../lib/types";
 import { downloadContractPdf } from "../utils/contractPdf";
+import { sanitizeContract } from "../lib/firestoreUtils";
 
 export default function Contracts() {
   const {
@@ -28,28 +29,29 @@ export default function Contracts() {
   const [sharePhone, setSharePhone] = useState("");
   const [shareMessage, setShareMessage] = useState("");
 
-  const emptyContract = (): Contract => ({
-    id: uid(),
-    clientName: "",
-    cpf: "",
-    partyDate: new Date().toISOString().slice(0, 10),
-    theme: "",
-    items: [],
-    value: 0,
-    deposit: 0,
-    delivery: 0,
-    assembly: 0,
-    discount: 0,
-    pickupDate: new Date().toISOString().slice(0, 10),
-    pickupTime: "09:00",
-    returnDate: new Date(Date.now() + 86400000).toISOString().slice(0, 10),
-    returnTime: "12:00",
-    signed: false,
-    signature: "",
-    status: "Pendente",
-    createdAt: new Date().toISOString().slice(0, 10),
-    customTerms: companySettings.terms || contractRules,
-  });
+  const emptyContract = (): Contract =>
+    sanitizeContract({
+      id: uid(),
+      clientName: "",
+      cpf: "",
+      partyDate: new Date().toISOString().slice(0, 10),
+      theme: "",
+      items: [],
+      value: 0,
+      deposit: 0,
+      delivery: 0,
+      assembly: 0,
+      discount: 0,
+      pickupDate: new Date().toISOString().slice(0, 10),
+      pickupTime: "09:00",
+      returnDate: new Date(Date.now() + 86400000).toISOString().slice(0, 10),
+      returnTime: "12:00",
+      signed: false,
+      signature: "",
+      status: "Pendente",
+      createdAt: new Date().toISOString().slice(0, 10),
+      customTerms: companySettings.terms || contractRules || "",
+    });
 
   const [c, setC] = useState<Contract>(emptyContract());
   const [signOpen, setSignOpen] = useState<Contract | null>(null);
@@ -82,12 +84,17 @@ export default function Contracts() {
   const save = () => {
     if (!c.clientName.trim()) return toast("Informe a cliente");
     const exists = contracts.some((x) => x.id === c.id);
-    const updated = exists ? contracts.map((x) => (x.id === c.id ? c : x)) : [c, ...contracts];
+    const sanitized = sanitizeContract({
+      ...c,
+      clientName: c.clientName.trim(),
+      customTerms: c.customTerms || companySettings.terms || contractRules || "",
+    });
+    const updated = exists ? contracts.map((x) => (x.id === c.id ? sanitized : x)) : [sanitized, ...contracts];
     setContracts(updated);
     setOpen(false);
     logAction(
       exists ? "Contrato Atualizado" : "Novo Contrato Gerado",
-      `${c.clientName} - ${c.theme} (${brl(c.value)})`
+      `${sanitized.clientName} - ${sanitized.theme} (${brl(sanitized.value)})`
     );
     toast(exists ? "Contrato atualizado!" : "Contrato gerado com sucesso!");
   };
@@ -133,19 +140,17 @@ export default function Contracts() {
       }
     }
 
+    const updatedContract = sanitizeContract({
+      ...signOpen,
+      signed: true,
+      signature: sigName.trim(),
+      signatureImage: signatureImg || signOpen.signatureImage || "",
+      signedAt: new Date().toISOString(),
+      status: "Assinado" as ContractStatus,
+    });
+
     setContracts(
-      contracts.map((x) =>
-        x.id === signOpen.id
-          ? {
-              ...x,
-              signed: true,
-              signature: sigName.trim(),
-              signatureImage: signatureImg,
-              signedAt: new Date().toISOString(),
-              status: "Assinado" as ContractStatus,
-            }
-          : x
-      )
+      contracts.map((x) => (x.id === signOpen.id ? updatedContract : x))
     );
     logAction("Contrato Assinado", `Contrato #${signOpen.id} assinado por ${sigName.trim()}`);
     setSignOpen(null);

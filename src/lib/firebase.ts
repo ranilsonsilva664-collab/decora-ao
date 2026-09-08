@@ -22,7 +22,8 @@ isSupported().then(supported => {
 }).catch(console.error);
 
 export const db = initializeFirestore(app, {
-  localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
+  localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
+  ignoreUndefinedProperties: true,
 });
 
 export const storage = getStorage(app);

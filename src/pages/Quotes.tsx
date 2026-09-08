@@ -7,6 +7,7 @@ import { copy, waLink } from "../lib/helpers";
 import { useToast } from "../components/Toast";
 import type { Quote, QuoteStatus, EventRentedItem, Contract } from "../lib/types";
 import { getItemAvailability, checkKitAvailability } from "../lib/availability";
+import { sanitizeContract } from "../lib/firestoreUtils";
 
 const STATUSES: QuoteStatus[] = [
   "Rascunho",
@@ -215,13 +216,13 @@ export default function Quotes() {
   const transformToContract = (item: Quote) => {
     const client = clients.find((c) => c.name.toLowerCase() === item.clientName.toLowerCase());
 
-    const newContract: Contract = {
+    const newContract: Contract = sanitizeContract({
       id: uid(),
-      clientId: item.clientId || client?.id,
-      clientName: item.clientName,
+      clientId: item.clientId || client?.id || "",
+      clientName: item.clientName || "",
       cpf: client?.cpf || "",
-      quoteId: item.id,
-      eventId: item.eventId,
+      quoteId: item.id || "",
+      eventId: item.eventId || "",
       partyDate: item.date,
       theme: item.theme,
       items: item.items || [],
@@ -237,9 +238,9 @@ export default function Quotes() {
       signed: false,
       signature: "",
       status: "Pendente",
-      customTerms: companySettings.terms || contractRules,
+      customTerms: companySettings.terms || contractRules || "",
       createdAt: new Date().toISOString().slice(0, 10),
-    };
+    });
 
     // Update quote status to "Convertido em contrato"
     const updatedQuotes = quotes.map((x) =>

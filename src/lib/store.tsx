@@ -20,6 +20,7 @@ import type {
 } from "./types";
 import { seedTemplates } from "./seed";
 import { uid } from "./format";
+import { sanitizeForFirestore, sanitizeContract } from "./firestoreUtils";
 
 const DEFAULT_CONTRACT_RULES =
   "*Regras de uso:*\n" +
@@ -144,9 +145,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     const unsub = onSnapshot(doc(db, "tenant_data", tenantId), (snapshot) => {
       if (snapshot.exists()) {
         const firestoreData = snapshot.data() as Partial<TenantData>;
+        const loadedContracts = (firestoreData.contracts || []).map(sanitizeContract);
         setData({
           ...DEFAULT_DATA, // ensure all fields exist
           ...firestoreData,
+          contracts: loadedContracts,
           categories: firestoreData.categories && firestoreData.categories.length > 0 ? firestoreData.categories : DEFAULT_CATEGORIES,
           companySettings: firestoreData.companySettings ? { ...DEFAULT_COMPANY_SETTINGS, ...firestoreData.companySettings } : DEFAULT_COMPANY_SETTINGS,
           kits: firestoreData.kits || [],
@@ -156,7 +159,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         });
       } else {
         // If data doc doesn't exist, initialize it
-        setDoc(doc(db, "tenant_data", tenantId), DEFAULT_DATA, { merge: true });
+        setDoc(doc(db, "tenant_data", tenantId), sanitizeForFirestore(DEFAULT_DATA), { merge: true });
         setData(DEFAULT_DATA);
       }
       setIsLoading(false);
@@ -213,14 +216,51 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem("crm_tenant_id");
   };
 
-  const updateData = (key: keyof TenantData, value: any) => {
+  const updateData = async (key: keyof TenantData, value: any) => {
     if (!tenantId || isAdmin) return;
     
+    const sanitizedVal = key === "contracts" && Array.isArray(value)
+      ? value.map(sanitizeContract)
+      : sanitizeForFirestore(value);
+
     // Optimistic local update
-    setData((prev) => ({ ...prev, [key]: value }));
+    setData((prev) => ({ ...prev, [key]: sanitizedVal }));
     
     // Save to Firestore
-    setDoc(doc(db, "tenant_data", tenantId), { [key]: value }, { merge: true }).catch(console.error);
+    try {
+      await setDoc(doc(db, "tenant_data", tenantId), { [key]: sanitizedVal }, { merge: true });
+
+      // Dual-save contracts to public_contracts collection for 100% reliable public signing
+      if (key === "contracts" && Array.isArray(sanitizedVal)) {
+        for (const contract of sanitizedVal as Contract[]) {
+          if (contract && contract.id) {
+            try {
+              const pubDocRef = doc(db, "public_contracts", `${tenantId}_${contract.id}`);
+              await setDoc(
+                pubDocRef,
+                sanitizeForFirestore({
+                  ...contract,
+                  tenantId,
+                  companySettings: {
+                    name: data.companySettings?.name || "RAYDECOR Pegue e Monte",
+                    tradeName: data.companySettings?.tradeName || "RAYDECOR",
+                    logo: data.companySettings?.logo || "",
+                    phone: data.companySettings?.phone || data.companySettings?.whatsapp || "",
+                    terms: contract.customTerms || data.companySettings?.terms || data.contractRules || "",
+                  },
+                  updatedAt: new Date().toISOString(),
+                }),
+                { merge: true }
+              );
+            } catch (errPub) {
+              console.warn("Aviso ao salvar cópia pública individual do contrato:", errPub);
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.error(`Erro crítico ao salvar ${key} no Firestore:`, err);
+    }
   };
 
   const logAction = (action: string, details: string) => {
