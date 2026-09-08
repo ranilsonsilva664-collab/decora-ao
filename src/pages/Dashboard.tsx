@@ -338,7 +338,15 @@ export default function Dashboard({ go }: { go: (p: Page) => void }) {
           />
         </Card>
         <Card>
-          <SectionTitle title="Temas Mais Alugados" />
+          <div className="flex items-center justify-between mb-2">
+            <SectionTitle title="Temas Mais Alugados" />
+            <button
+              onClick={() => go("inventory")}
+              className="text-xs font-semibold text-pink-600 hover:text-pink-800 transition"
+            >
+              Ver Acervo →
+            </button>
+          </div>
           <HBars data={topThemes} />
         </Card>
       </div>

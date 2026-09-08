@@ -26,6 +26,7 @@ export type Page =
   | "dashboard"
   | "clients"
   | "stock"
+  | "inventory"
   | "quotes"
   | "contracts"
   | "events"
@@ -40,13 +41,14 @@ export type Page =
 const MAIN_NAV: { id: Page; label: string; icon: (p: { className?: string }) => React.ReactNode }[] = [
   { id: "dashboard", label: "Dashboard", icon: Icon.dashboard },
   { id: "clients", label: "Clientes", icon: Icon.clients },
-  { id: "stock", label: "Acervo", icon: Icon.box },
+  { id: "stock", label: "Acervo", icon: Icon.inventory },
   { id: "quotes", label: "Orçamentos", icon: Icon.quote },
   { id: "contracts", label: "Contratos", icon: Icon.contract },
 ];
 
 // Área Mais (Requisito 34)
 const MORE_NAV: { id: Page; label: string; emoji: string }[] = [
+  { id: "inventory", label: "Temas do Acervo", emoji: "🎀" },
   { id: "events", label: "Eventos & Retiradas", emoji: "📦" },
   { id: "calendar", label: "Calendário de Festas", emoji: "🗓️" },
   { id: "finance", label: "Financeiro & Recibos", emoji: "💰" },
@@ -110,7 +112,9 @@ function Shell() {
       case "clients":
         return <Clients />;
       case "stock":
-        return <Stock />;
+        return <Stock initialTab="items" />;
+      case "inventory":
+        return <Stock initialTab="themes" />;
       case "quotes":
         return <Quotes />;
       case "contracts":
@@ -293,7 +297,7 @@ function Shell() {
           className={cn(
             "flex flex-1 min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl py-1 text-[9.5px] font-semibold transition active:scale-95",
             showMoreModal ||
-              ["events", "calendar", "finance", "reports", "forms", "company", "messages"].includes(page)
+              ["inventory", "events", "calendar", "finance", "reports", "forms", "company", "messages"].includes(page)
               ? "text-purple-600 font-bold"
               : "text-stone-400"
           )}
@@ -301,7 +305,7 @@ function Shell() {
           <span
             className={cn(
               "grid h-8 w-8 place-items-center rounded-xl transition",
-              ["events", "calendar", "finance", "reports", "forms", "company", "messages"].includes(page) &&
+              ["inventory", "events", "calendar", "finance", "reports", "forms", "company", "messages"].includes(page) &&
                 "bg-gradient-to-br from-purple-400 to-pink-500 text-white shadow-md shadow-purple-200"
             )}
           >

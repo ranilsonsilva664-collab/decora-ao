@@ -1,14 +1,35 @@
-import { useState, useRef, useMemo } from "react";
+import { useState, useRef, useMemo, useEffect } from "react";
 import { Card, SectionTitle, Button, Modal, Field, Input, Textarea, Select, Badge } from "../components/ui";
 import { Icon } from "../components/icons";
 import { useStore } from "../lib/store";
 import { uid, brl, fmtDate } from "../lib/format";
 import { useToast } from "../components/Toast";
 import { compressImage } from "../utils/image";
-import type { InventoryItem, Kit, KitItemComponent, ItemCondition, ItemStatus } from "../lib/types";
+import type { InventoryItem, Kit, KitItemComponent, ItemCondition, ItemStatus, PartyTheme, ThemeStatus } from "../lib/types";
 import { storage } from "../lib/firebase";
 import { ref, uploadString, getDownloadURL, deleteObject } from "firebase/storage";
 import { getItemAvailability, getItemReservations } from "../lib/availability";
+
+const THEME_STATUSES: ThemeStatus[] = ["Disponível", "Reservado", "Em manutenção"];
+const themeStatusColor: Record<ThemeStatus, string> = {
+  Disponível: "green",
+  Reservado: "gold",
+  "Em manutenção": "amber",
+};
+const THEME_EMOJIS = [
+  "🎀", "🌸", "👑", "🦄", "🦁", "🚀", "🌷", "🐶", "⚽", "🧜‍♀️", "🦕", "🌈", "🐉", "🍓", "🩵", "✨", "🎈", "🎂", "🎪", "🏰"
+];
+
+const emptyTheme = (): PartyTheme => ({
+  id: uid(),
+  name: "",
+  photo: "🎀",
+  pieces: 0,
+  invested: 0,
+  rentals: 0,
+  revenue: 0,
+  status: "Disponível",
+});
 
 const generateItemCode = (existingCount: number) => {
   return `AC-${String(existingCount + 1).padStart(3, "0")}`;
@@ -47,10 +68,16 @@ const emptyKit = (): Kit => ({
   createdAt: new Date().toISOString(),
 });
 
-export default function Stock() {
+export default function Stock({
+  initialTab = "items",
+}: {
+  initialTab?: "items" | "themes" | "kits" | "categories" | "catalog";
+} = {}) {
   const {
     inventoryItems,
     setInventoryItems,
+    themes,
+    setThemes,
     kits,
     setKits,
     categories,
@@ -64,10 +91,25 @@ export default function Stock() {
 
   const toast = useToast();
 
-  const [activeTab, setActiveTab] = useState<"items" | "kits" | "categories" | "catalog">("items");
+  const [activeTab, setActiveTab] = useState<"items" | "themes" | "kits" | "categories" | "catalog">(initialTab);
   const [search, setSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("Todas");
   const [statusFilter, setStatusFilter] = useState<string>("Todos");
+
+  useEffect(() => {
+    if (initialTab) {
+      setActiveTab(initialTab);
+    }
+  }, [initialTab]);
+
+  // Theme State
+  const [themeSearch, setThemeSearch] = useState("");
+  const [themeStatusFilter, setThemeStatusFilter] = useState<string>("Todos");
+  const [openTheme, setOpenTheme] = useState(false);
+  const [themeItem, setThemeItem] = useState<PartyTheme>(emptyTheme());
+  const [themePhotoType, setThemePhotoType] = useState<"emoji" | "upload">("emoji");
+  const [themeUploading, setThemeUploading] = useState(false);
+  const themeFileInputRef = useRef<HTMLInputElement>(null);
 
   // Item Modal State
   const [openItem, setOpenItem] = useState(false);
@@ -94,6 +136,7 @@ export default function Stock() {
   const [calendarItem, setCalendarItem] = useState<InventoryItem | null>(null);
 
   const safeItems = inventoryItems || [];
+  const safeThemes = themes || [];
   const safeKits = kits || [];
   const safeCategories = categories && categories.length > 0 ? categories : ["Painéis", "Cilindros", "Mesas", "Bandejas", "Kits", "Outros"];
 
@@ -103,6 +146,20 @@ export default function Stock() {
   const damagedPieces = safeItems.reduce((acc, it) => acc + (it.damaged || 0), 0);
   const lostPieces = safeItems.reduce((acc, it) => acc + (it.lost || 0), 0);
   const totalValueRental = safeItems.reduce((acc, it) => acc + (it.rentalPrice || 0) * (it.quantity || 0), 0);
+
+  // Theme Metrics & Filtering
+  const totalThemeInvested = safeThemes.reduce((s, t) => s + (t.invested || 0), 0);
+  const totalThemeRevenue = safeThemes.reduce((s, t) => s + (t.revenue || 0), 0);
+  const totalThemeRentals = safeThemes.reduce((s, t) => s + (t.rentals || 0), 0);
+  const themeRoiTotal = totalThemeInvested > 0 ? ((totalThemeRevenue - totalThemeInvested) / totalThemeInvested) * 100 : 0;
+
+  const filteredThemes = useMemo(() => {
+    return safeThemes.filter((t) => {
+      const matchSearch = t.name.toLowerCase().includes(themeSearch.toLowerCase());
+      const matchStatus = themeStatusFilter === "Todos" ? true : t.status === themeStatusFilter;
+      return matchSearch && matchStatus;
+    });
+  }, [safeThemes, themeSearch, themeStatusFilter]);
 
   // Filtered items
   const filteredItems = useMemo(() => {
@@ -382,13 +439,61 @@ export default function Stock() {
     toast("Categoria removida");
   };
 
+  // Theme Functions
+  const handleThemePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setThemeUploading(true);
+    toast("Otimizando foto do tema...");
+    try {
+      const compressed = await compressImage(file, 900, 0.82);
+      if (compressed.startsWith("data:image")) {
+        try {
+          const fileName = `tenants/${tenantId}/themes/${themeItem.id || uid()}/${uid()}.jpg`;
+          const sRef = ref(storage, fileName);
+          await uploadString(sRef, compressed, "data_url");
+          const url = await getDownloadURL(sRef);
+          setThemeItem((prev) => ({ ...prev, photo: url }));
+          toast("Foto do tema carregada!");
+        } catch {
+          setThemeItem((prev) => ({ ...prev, photo: compressed }));
+          toast("Foto carregada!");
+        }
+      }
+    } catch {
+      toast("Erro ao carregar imagem.");
+    } finally {
+      setThemeUploading(false);
+    }
+  };
+
+  const saveTheme = () => {
+    if (!themeItem.name.trim()) return toast("Informe o nome do tema");
+    const safeT = themes || [];
+    const exists = safeT.some((x) => x.id === themeItem.id);
+    const updated = exists ? safeT.map((x) => (x.id === themeItem.id ? themeItem : x)) : [themeItem, ...safeT];
+    setThemes(updated);
+    setOpenTheme(false);
+    logAction(exists ? "Tema Atualizado" : "Novo Tema Cadastrado", `${themeItem.name} (${themeItem.pieces || 0} peças)`);
+    toast(exists ? "Tema atualizado com sucesso!" : "Novo tema cadastrado no acervo!");
+  };
+
+  const deleteTheme = (id: string) => {
+    if (!confirm("Deseja realmente excluir este tema do acervo?")) return;
+    const safeT = themes || [];
+    setThemes(safeT.filter((x) => x.id !== id));
+    setOpenTheme(false);
+    logAction("Tema Removido", `ID: ${id}`);
+    toast("Tema removido do acervo.");
+  };
+
   const catalogUrl = `${window.location.origin}/catalog/${tenantId}`;
 
   return (
     <div className="space-y-5">
       <SectionTitle
         title="Acervo Inteligente"
-        subtitle="Gerenciamento completo de peças, kits e controle real de estoque"
+        subtitle="Gerenciamento completo de peças avulsas, temas de festa e kits para locação"
         action={
           <div className="flex flex-wrap gap-2">
             {activeTab === "items" && (
@@ -399,6 +504,17 @@ export default function Stock() {
                 }}
               >
                 <Icon.plus className="h-4 w-4" /> + Adicionar Peça
+              </Button>
+            )}
+            {activeTab === "themes" && (
+              <Button
+                onClick={() => {
+                  setThemeItem(emptyTheme());
+                  setThemePhotoType("emoji");
+                  setOpenTheme(true);
+                }}
+              >
+                <Icon.plus className="h-4 w-4" /> + Adicionar Tema
               </Button>
             )}
             {activeTab === "kits" && (
@@ -416,28 +532,53 @@ export default function Stock() {
       />
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Card className="!p-4">
-          <p className="text-xs font-medium text-stone-500">Total no Acervo</p>
-          <p className="mt-1 text-2xl font-bold text-stone-800">{totalPieces} un.</p>
-          <p className="text-[11px] text-stone-400">{safeItems.length} cadastros</p>
-        </Card>
-        <Card className="!p-4">
-          <p className="text-xs font-medium text-stone-500">Em Manutenção</p>
-          <p className="mt-1 text-2xl font-bold text-amber-500">{inMaintenancePieces} un.</p>
-          <p className="text-[11px] text-stone-400">fora de circulação</p>
-        </Card>
-        <Card className="!p-4">
-          <p className="text-xs font-medium text-stone-500">Danificadas / Avarias</p>
-          <p className="mt-1 text-2xl font-bold text-rose-500">{damagedPieces + lostPieces} un.</p>
-          <p className="text-[11px] text-stone-400">{lostPieces} perdidas</p>
-        </Card>
-        <Card className="!p-4">
-          <p className="text-xs font-medium text-stone-500">Potencial Locação</p>
-          <p className="mt-1 text-2xl font-bold text-emerald-600">{brl(totalValueRental)}</p>
-          <p className="text-[11px] text-stone-400">giro total das peças</p>
-        </Card>
-      </div>
+      {activeTab === "themes" ? (
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <Card className="!p-4">
+            <p className="text-xs font-medium text-stone-500">Temas no Acervo</p>
+            <p className="mt-1 text-2xl font-bold text-stone-800">{safeThemes.length}</p>
+            <p className="text-[11px] text-stone-400">temas cadastrados</p>
+          </Card>
+          <Card className="!p-4">
+            <p className="text-xs font-medium text-stone-500">Total Investido</p>
+            <p className="mt-1 text-2xl font-bold text-stone-700">{brl(totalThemeInvested)}</p>
+            <p className="text-[11px] text-stone-400">em peças e temas</p>
+          </Card>
+          <Card className="!p-4">
+            <p className="text-xs font-medium text-stone-500">Já Faturado</p>
+            <p className="mt-1 text-2xl font-bold text-emerald-600">{brl(totalThemeRevenue)}</p>
+            <p className="text-[11px] text-stone-400">receita com locações</p>
+          </Card>
+          <Card className="!p-4">
+            <p className="text-xs font-medium text-stone-500">Total Locações (Giro)</p>
+            <p className="mt-1 text-2xl font-bold text-lilac-500">{totalThemeRentals}x</p>
+            <p className="text-[11px] text-stone-400">ROI Médio: {themeRoiTotal.toFixed(0)}%</p>
+          </Card>
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <Card className="!p-4">
+            <p className="text-xs font-medium text-stone-500">Total no Acervo</p>
+            <p className="mt-1 text-2xl font-bold text-stone-800">{totalPieces} un.</p>
+            <p className="text-[11px] text-stone-400">{safeItems.length} cadastros</p>
+          </Card>
+          <Card className="!p-4">
+            <p className="text-xs font-medium text-stone-500">Em Manutenção</p>
+            <p className="mt-1 text-2xl font-bold text-amber-500">{inMaintenancePieces} un.</p>
+            <p className="text-[11px] text-stone-400">fora de circulação</p>
+          </Card>
+          <Card className="!p-4">
+            <p className="text-xs font-medium text-stone-500">Danificadas / Avarias</p>
+            <p className="mt-1 text-2xl font-bold text-rose-500">{damagedPieces + lostPieces} un.</p>
+            <p className="text-[11px] text-stone-400">{lostPieces} perdidas</p>
+          </Card>
+          <Card className="!p-4">
+            <p className="text-xs font-medium text-stone-500">Potencial Locação</p>
+            <p className="mt-1 text-2xl font-bold text-emerald-600">{brl(totalValueRental)}</p>
+            <p className="text-[11px] text-stone-400">giro total das peças</p>
+          </Card>
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="flex gap-2 overflow-x-auto border-b border-white/60 pb-1">
@@ -450,6 +591,16 @@ export default function Stock() {
           }`}
         >
           <Icon.box className="h-4 w-4" /> Peças Individuais ({safeItems.length})
+        </button>
+        <button
+          onClick={() => setActiveTab("themes")}
+          className={`flex items-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-semibold transition ${
+            activeTab === "themes"
+              ? "bg-gradient-to-r from-nude-400 to-lilac-400 text-white shadow-md shadow-lilac-200"
+              : "bg-white/60 text-stone-600 hover:bg-white"
+          }`}
+        >
+          <span>🎀</span> Temas Completos ({safeThemes.length})
         </button>
         <button
           onClick={() => setActiveTab("kits")}
@@ -661,7 +812,155 @@ export default function Stock() {
         </div>
       )}
 
-      {/* TAB 2: KITS E COMPOSIÇÃO */}
+      {/* TAB 2: TEMAS COMPLETOS (ACERVO) */}
+      {activeTab === "themes" && (
+        <div className="space-y-4">
+          {/* Filters Bar */}
+          <Card className="!p-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+              <div className="relative flex-1">
+                <Icon.dashboard className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-stone-400" />
+                <Input
+                  className="pl-9 !bg-white"
+                  placeholder="Buscar tema por nome (Ex: Stitch, Safari, Moana)..."
+                  value={themeSearch}
+                  onChange={(e) => setThemeSearch(e.target.value)}
+                />
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Select
+                  value={themeStatusFilter}
+                  onChange={(e) => setThemeStatusFilter(e.target.value)}
+                  className="!w-auto !bg-white text-xs font-medium"
+                >
+                  <option value="Todos">Todos os status</option>
+                  <option value="Disponível">Disponíveis</option>
+                  <option value="Reservado">Reservados</option>
+                  <option value="Em manutenção">Em Manutenção</option>
+                </Select>
+                <Button
+                  onClick={() => {
+                    setThemeItem(emptyTheme());
+                    setThemePhotoType("emoji");
+                    setOpenTheme(true);
+                  }}
+                  className="!py-2 text-xs"
+                >
+                  <Icon.plus className="h-4 w-4" /> + Novo Tema
+                </Button>
+              </div>
+            </div>
+          </Card>
+
+          {/* Grid de Temas */}
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {filteredThemes.map((item) => {
+              const roi = item.invested ? ((item.revenue - item.invested) / item.invested) * 100 : 0;
+              const isImg = item.photo && (item.photo.startsWith("http") || item.photo.startsWith("data:"));
+
+              return (
+                <Card
+                  key={item.id}
+                  className="animate-rise flex flex-col justify-between relative overflow-hidden transition hover:shadow-xl hover:shadow-lilac-200/50"
+                >
+                  <div>
+                    <div className="flex items-start justify-between gap-2 mb-3">
+                      <div className="flex items-center gap-3">
+                        <div className="grid h-14 w-14 place-items-center rounded-2xl bg-gradient-to-br from-nude-100 to-lilac-100 overflow-hidden shrink-0 border border-stone-100 shadow-sm">
+                          {isImg ? (
+                            <img src={item.photo} alt={item.name} className="h-full w-full object-cover" />
+                          ) : (
+                            <span className="text-3xl">{item.photo || "🎀"}</span>
+                          )}
+                        </div>
+                        <div className="min-w-0">
+                          <h3 className="font-bold text-stone-800 text-base leading-snug truncate">
+                            {item.name}
+                          </h3>
+                          <p className="text-xs text-stone-500 font-medium">{item.pieces} peças inclusas</p>
+                        </div>
+                      </div>
+                      <Badge color={themeStatusColor[item.status] || "gray"}>{item.status}</Badge>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div className="rounded-xl bg-white/70 p-2.5 border border-stone-100">
+                        <p className="text-[10px] uppercase font-semibold text-stone-400">Investimento</p>
+                        <p className="font-bold text-stone-700 text-sm mt-0.5">{brl(item.invested || 0)}</p>
+                      </div>
+                      <div className="rounded-xl bg-white/70 p-2.5 border border-stone-100">
+                        <p className="text-[10px] uppercase font-semibold text-stone-400">Já faturou</p>
+                        <p className="font-bold text-emerald-600 text-sm mt-0.5">{brl(item.revenue || 0)}</p>
+                      </div>
+                      <div className="rounded-xl bg-white/70 p-2.5 border border-stone-100">
+                        <p className="text-[10px] uppercase font-semibold text-stone-400">Locações</p>
+                        <p className="font-bold text-lilac-500 text-sm mt-0.5">{item.rentals || 0}x</p>
+                      </div>
+                      <div className="rounded-xl bg-white/70 p-2.5 border border-stone-100">
+                        <p className="text-[10px] uppercase font-semibold text-stone-400">Retorno (ROI)</p>
+                        <p
+                          className={`font-bold text-sm mt-0.5 ${
+                            roi >= 0 ? "text-emerald-600" : "text-rose-500"
+                          }`}
+                        >
+                          {roi.toFixed(0)}%
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 pt-3 border-t border-stone-100 flex gap-2">
+                    <Button
+                      variant="soft"
+                      className="flex-1 !py-1.5 text-xs font-semibold"
+                      onClick={() => {
+                        setThemeItem(item);
+                        setThemePhotoType(
+                          item.photo && (item.photo.startsWith("http") || item.photo.startsWith("data:"))
+                            ? "upload"
+                            : "emoji"
+                        );
+                        setOpenTheme(true);
+                      }}
+                    >
+                      <Icon.edit className="h-3.5 w-3.5" /> Editar Tema
+                    </Button>
+                    <Button
+                      variant="soft"
+                      className="!text-rose-500 !py-1.5 text-xs"
+                      onClick={() => deleteTheme(item.id)}
+                    >
+                      Excluir
+                    </Button>
+                  </div>
+                </Card>
+              );
+            })}
+
+            {filteredThemes.length === 0 && (
+              <div className="col-span-full py-16 text-center text-stone-400">
+                <span className="text-4xl block mb-2">🎀</span>
+                <p className="font-medium text-base text-stone-600">Nenhum tema encontrado</p>
+                <p className="text-xs text-stone-400 mt-1">
+                  Cadastre seus temas completos de festa para gerenciar peças e retorno de investimento.
+                </p>
+                <Button
+                  className="mt-4"
+                  onClick={() => {
+                    setThemeItem(emptyTheme());
+                    setThemePhotoType("emoji");
+                    setOpenTheme(true);
+                  }}
+                >
+                  <Icon.plus className="h-4 w-4" /> + Cadastrar Primeiro Tema
+                </Button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* TAB 3: KITS E COMPOSIÇÃO */}
       {activeTab === "kits" && (
         <div className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -1340,6 +1639,169 @@ export default function Stock() {
             </div>
           </div>
         )}
+      </Modal>
+
+      {/* MODAL: TEMA DO ACERVO */}
+      <Modal
+        open={openTheme}
+        onClose={() => setOpenTheme(false)}
+        title={safeThemes.some((x) => x.id === themeItem.id) ? "Editar Tema do Acervo" : "Novo Tema no Acervo"}
+        wide
+      >
+        <div className="space-y-4 mt-2">
+          {/* Photo Mode Selection */}
+          <div>
+            <label className="text-xs font-semibold text-stone-700 block mb-2">
+              Ícone ou Foto de Capa do Tema:
+            </label>
+            <div className="flex gap-2 mb-3">
+              <button
+                type="button"
+                onClick={() => setThemePhotoType("emoji")}
+                className={`flex-1 py-2 rounded-xl text-xs font-bold border transition ${
+                  themePhotoType === "emoji"
+                    ? "bg-pink-50 border-pink-300 text-pink-700 shadow-sm"
+                    : "bg-white border-stone-200 text-stone-600 hover:bg-stone-50"
+                }`}
+              >
+                ✨ Escolher Emoji
+              </button>
+              <button
+                type="button"
+                onClick={() => setThemePhotoType("upload")}
+                className={`flex-1 py-2 rounded-xl text-xs font-bold border transition ${
+                  themePhotoType === "upload"
+                    ? "bg-pink-50 border-pink-300 text-pink-700 shadow-sm"
+                    : "bg-white border-stone-200 text-stone-600 hover:bg-stone-50"
+                }`}
+              >
+                📷 Enviar Foto Real
+              </button>
+            </div>
+
+            {themePhotoType === "emoji" ? (
+              <div className="flex flex-wrap gap-2 p-3 bg-stone-50 rounded-2xl border border-stone-200 max-h-40 overflow-y-auto">
+                {THEME_EMOJIS.map((em) => (
+                  <button
+                    key={em}
+                    type="button"
+                    onClick={() => setThemeItem({ ...themeItem, photo: em })}
+                    className={`grid h-11 w-11 place-items-center rounded-xl text-2xl transition ${
+                      themeItem.photo === em
+                        ? "bg-gradient-to-br from-nude-400 to-lilac-400 text-white scale-110 shadow-md"
+                        : "bg-white hover:bg-stone-100 shadow-sm"
+                    }`}
+                  >
+                    {em}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="flex items-center gap-4 p-4 bg-stone-50 rounded-2xl border border-stone-200">
+                <div className="h-20 w-20 rounded-2xl bg-white border border-stone-200 overflow-hidden grid place-items-center shrink-0">
+                  {themeItem.photo && (themeItem.photo.startsWith("http") || themeItem.photo.startsWith("data:")) ? (
+                    <img src={themeItem.photo} alt="Prévia" className="h-full w-full object-cover" />
+                  ) : (
+                    <span className="text-3xl">{themeItem.photo || "📷"}</span>
+                  )}
+                </div>
+                <div className="flex-1">
+                  <input
+                    ref={themeFileInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleThemePhotoUpload}
+                  />
+                  <Button
+                    type="button"
+                    variant="soft"
+                    onClick={() => themeFileInputRef.current?.click()}
+                    disabled={themeUploading}
+                    className="!py-2 text-xs"
+                  >
+                    {themeUploading ? "Enviando..." : "Selecionar Foto da Galeria"}
+                  </Button>
+                  <p className="text-[11px] text-stone-400 mt-1">Formatos JPG, PNG ou WebP. Compressão automática.</p>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Nome do tema">
+              <Input
+                value={themeItem.name}
+                onChange={(e) => setThemeItem({ ...themeItem, name: e.target.value })}
+                placeholder="Ex: Safari Baby, Stitch, Princesas..."
+              />
+            </Field>
+            <Field label="Quantidade de peças incluídas">
+              <Input
+                type="number"
+                value={themeItem.pieces || ""}
+                onChange={(e) => setThemeItem({ ...themeItem, pieces: Number(e.target.value) || 0 })}
+                placeholder="Ex: 12"
+              />
+            </Field>
+            <Field label="Valor investido para montagem (R$)">
+              <Input
+                type="number"
+                value={themeItem.invested || ""}
+                onChange={(e) => setThemeItem({ ...themeItem, invested: Number(e.target.value) || 0 })}
+                placeholder="0,00"
+              />
+            </Field>
+            <Field label="Valor já faturado com este tema (R$)">
+              <Input
+                type="number"
+                value={themeItem.revenue || ""}
+                onChange={(e) => setThemeItem({ ...themeItem, revenue: Number(e.target.value) || 0 })}
+                placeholder="0,00"
+              />
+            </Field>
+            <Field label="Quantidade total de locações">
+              <Input
+                type="number"
+                value={themeItem.rentals || ""}
+                onChange={(e) => setThemeItem({ ...themeItem, rentals: Number(e.target.value) || 0 })}
+                placeholder="0"
+              />
+            </Field>
+            <Field label="Status do tema">
+              <Select
+                value={themeItem.status}
+                onChange={(e) => setThemeItem({ ...themeItem, status: e.target.value as ThemeStatus })}
+              >
+                {THEME_STATUSES.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+          </div>
+
+          <div className="mt-6 flex items-center justify-between border-t border-stone-100 pt-4">
+            {safeThemes.some((x) => x.id === themeItem.id) ? (
+              <Button
+                variant="soft"
+                className="!text-rose-500"
+                onClick={() => deleteTheme(themeItem.id)}
+              >
+                Excluir Tema
+              </Button>
+            ) : (
+              <div />
+            )}
+            <div className="flex gap-2">
+              <Button variant="ghost" onClick={() => setOpenTheme(false)}>
+                Cancelar
+              </Button>
+              <Button onClick={saveTheme}>Salvar Tema</Button>
+            </div>
+          </div>
+        </div>
       </Modal>
     </div>
   );
