@@ -139,11 +139,16 @@ export default function Stock() {
       for (let i = 0; i < currentPhotos.length; i++) {
         const p = currentPhotos[i];
         if (p.startsWith("data:image")) {
-          const fileName = `tenants/${tenantId}/stock/${item.id}/${uid()}.jpg`;
-          const sRef = ref(storage, fileName);
-          await uploadString(sRef, p, "data_url");
-          const url = await getDownloadURL(sRef);
-          finalPhotos.push(url);
+          try {
+            const fileName = `tenants/${tenantId}/stock/${item.id}/${uid()}.jpg`;
+            const sRef = ref(storage, fileName);
+            await uploadString(sRef, p, "data_url");
+            const url = await getDownloadURL(sRef);
+            finalPhotos.push(url);
+          } catch (storageErr) {
+            console.warn("Storage upload failed, keeping compressed base64 directly", storageErr);
+            finalPhotos.push(p);
+          }
         } else {
           finalPhotos.push(p);
         }

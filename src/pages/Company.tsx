@@ -1,12 +1,9 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Card, SectionTitle, Button, Field, Input, Textarea, Select } from "../components/ui";
 import { Icon } from "../components/icons";
 import { useStore } from "../lib/store";
 import { useToast } from "../components/Toast";
 import { compressImage } from "../utils/image";
-import { storage } from "../lib/firebase";
-import { ref, uploadString, getDownloadURL } from "firebase/storage";
-import { uid } from "../lib/format";
 
 export default function Company() {
   const { companySettings, setCompanySettings, tenantId, logAction } = useStore();
@@ -17,27 +14,42 @@ export default function Company() {
   const [uploading, setUploading] = useState(false);
   const logoInputRef = useRef<HTMLInputElement>(null);
 
+  // Sync with store when data loads from Firestore
+  useEffect(() => {
+    if (companySettings) {
+      setSettings(companySettings);
+    }
+  }, [companySettings]);
+
   const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     setUploading(true);
-    toast("Comprimindo e enviando logo...");
+    toast("Processando logo...");
     try {
-      const base64 = await compressImage(file, 600, 0.8);
-      const fileName = `tenants/${tenantId}/company/logo_${uid()}.jpg`;
-      const sRef = ref(storage, fileName);
-      await uploadString(sRef, base64, "data_url");
-      const url = await getDownloadURL(sRef);
+      // Compress to lightweight high-res base64 (max 400px -> ~20KB)
+      const base64 = await compressImage(file, 400, 0.82);
 
-      setSettings((prev) => ({ ...prev, logo: url }));
-      toast("Logo atualizada!");
-    } catch {
-      toast("Erro ao enviar logo.");
+      const updated = { ...settings, logo: base64 };
+      setSettings(updated);
+      setCompanySettings(updated);
+      logAction("Logo Atualizada", "Nova logo da empresa configurada");
+      toast("Logo atualizada e salva com sucesso! ✨");
+    } catch (err) {
+      console.error("Erro ao carregar logo:", err);
+      toast("Erro ao processar imagem. Tente um arquivo JPG ou PNG.");
     } finally {
       setUploading(false);
       if (logoInputRef.current) logoInputRef.current.value = "";
     }
+  };
+
+  const handleRemoveLogo = () => {
+    const updated = { ...settings, logo: "" };
+    setSettings(updated);
+    setCompanySettings(updated);
+    toast("Logo removida com sucesso");
   };
 
   const handleSave = () => {
@@ -113,13 +125,25 @@ export default function Company() {
               className="hidden"
               disabled={uploading}
             />
-            <Button
-              variant="soft"
-              onClick={() => logoInputRef.current?.click()}
-              disabled={uploading}
-            >
-              <Icon.up className="h-4 w-4" /> Alterar Logo da Empresa
-            </Button>
+            <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
+              <Button
+                variant="soft"
+                onClick={() => logoInputRef.current?.click()}
+                disabled={uploading}
+              >
+                <Icon.up className="h-4 w-4" /> {settings.logo ? "Alterar Logo" : "Adicionar Logo"}
+              </Button>
+              {settings.logo && (
+                <button
+                  type="button"
+                  onClick={handleRemoveLogo}
+                  disabled={uploading}
+                  className="rounded-xl px-3 py-2 text-xs font-semibold text-rose-500 hover:bg-rose-50 transition"
+                >
+                  Remover Logo
+                </button>
+              )}
+            </div>
             <p className="text-xs text-stone-500">
               Formato recomendado: PNG ou JPG quadrado (ex: 500x500px). Aparece automaticamente nos
               orçamentos, contratos e recibos.
