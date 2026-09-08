@@ -309,6 +309,8 @@ export interface CompanySettings {
 
 export interface PublicFormSubmission {
   id: string;
+  contractId?: string;
+  clientId?: string;
   clientName: string;
   cpf: string;
   whatsapp: string;

@@ -1,14 +1,19 @@
 import { useState, useEffect } from "react";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { db } from "../lib/firebase";
-import type { TenantData, Client, EventModel, PublicFormSubmission } from "../lib/types";
-import { uid } from "../lib/format";
+import type { TenantData, Client, EventModel, PublicFormSubmission, Contract } from "../lib/types";
+import { uid, fmtDate } from "../lib/format";
+import { waLink } from "../lib/helpers";
+import { sanitizeContract } from "../lib/firestoreUtils";
 
 export default function PublicForm({ tenantId }: { tenantId: string }) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [createdContractId, setCreatedContractId] = useState<string | null>(null);
   const [companyName, setCompanyName] = useState("RAYDECOR Pegue e Monte");
+  const [companyPhone, setCompanyPhone] = useState("");
+  const [companyWhatsapp, setCompanyWhatsapp] = useState("");
   const [companyLogo, setCompanyLogo] = useState(
     "https://res.cloudinary.com/dmxeqe939/image/upload/v1785097595/ChatGPT_Image_26_de_jul._de_2026_17_25_48_ilxojd.png"
   );
@@ -44,8 +49,12 @@ export default function PublicForm({ tenantId }: { tenantId: string }) {
         if (snap.exists()) {
           const tData = snap.data() as Partial<TenantData>;
           if (tData.companySettings) {
-            if (tData.companySettings.name) setCompanyName(tData.companySettings.name);
+            if (tData.companySettings.tradeName || tData.companySettings.name) {
+              setCompanyName(tData.companySettings.tradeName || tData.companySettings.name || "RAYDECOR Pegue e Monte");
+            }
             if (tData.companySettings.logo) setCompanyLogo(tData.companySettings.logo);
+            if (tData.companySettings.whatsapp) setCompanyWhatsapp(tData.companySettings.whatsapp);
+            if (tData.companySettings.phone) setCompanyPhone(tData.companySettings.phone);
           }
         }
       } catch {
@@ -152,9 +161,41 @@ export default function PublicForm({ tenantId }: { tenantId: string }) {
         createdAt: new Date().toISOString(),
       };
 
-      // 3. Create Submission record
+      // 3. GENERATE CONTRACT AUTOMATICALLY FROM FORM DATA
+      const contractId = uid();
+      const existingContracts = currentData.contracts || [];
+      const newContract: Contract = sanitizeContract({
+        id: contractId,
+        clientId,
+        clientName: name.trim(),
+        whatsapp: whatsapp.trim(),
+        clientPhone: whatsapp.trim(),
+        cpf: cpf.trim(),
+        eventId: newEvent.id,
+        partyDate: eventDate,
+        theme: theme.trim(),
+        items: [],
+        value: 0,
+        deposit: 0,
+        delivery: 0,
+        assembly: 0,
+        discount: 0,
+        pickupDate: eventDate,
+        pickupTime: "09:00",
+        returnDate: new Date(new Date(eventDate).getTime() + 86400000).toISOString().slice(0, 10),
+        returnTime: "12:00",
+        signed: false,
+        signature: "",
+        status: "Pendente",
+        customTerms: currentData.companySettings?.terms || currentData.contractRules || "",
+        createdAt: new Date().toISOString().slice(0, 10),
+      });
+
+      // 4. Create Submission record
       const newSubmission: PublicFormSubmission = {
         id: uid(),
+        contractId,
+        clientId,
         clientName: name.trim(),
         cpf: cpf.trim(),
         whatsapp: whatsapp.trim(),
@@ -180,8 +221,8 @@ export default function PublicForm({ tenantId }: { tenantId: string }) {
       const newLog = {
         id: uid(),
         timestamp: new Date().toISOString(),
-        action: "Formulário Recebido",
-        details: `${name.trim()} preencheu formulário para a festa ${theme.trim()} em ${eventDate}`,
+        action: "Formulário e Contrato Recebidos",
+        details: `${name.trim()} preencheu formulário e gerou contrato automático #${contractId} para a festa ${theme.trim()} em ${eventDate}`,
         user: "Cliente (Online)",
       };
 
@@ -191,12 +232,29 @@ export default function PublicForm({ tenantId }: { tenantId: string }) {
         {
           clients: newClients,
           eventsList: [newEvent, ...existingEvents],
+          contracts: [newContract, ...existingContracts],
           formSubmissions: [newSubmission, ...existingSubmissions],
           actionLogs: [newLog, ...existingLogs].slice(0, 100),
         },
         { merge: true }
       );
 
+      // Dual-save contract to public_contracts for 100% reliable public signing
+      try {
+        await setDoc(
+          doc(db, "public_contracts", `${tenantId}_${newContract.id}`),
+          {
+            ...newContract,
+            tenantId,
+            companySettings: currentData.companySettings || {},
+          },
+          { merge: true }
+        );
+      } catch (err) {
+        console.warn("Aviso ao salvar public_contracts:", err);
+      }
+
+      setCreatedContractId(contractId);
       setSubmitted(true);
     } catch (err) {
       console.error(err);
@@ -218,20 +276,75 @@ export default function PublicForm({ tenantId }: { tenantId: string }) {
   }
 
   if (submitted) {
+    const signUrl = createdContractId
+      ? `${window.location.origin}/assinar/${tenantId}/${createdContractId}`
+      : null;
+    const companyContact = companyWhatsapp || companyPhone;
+
     return (
       <div className="min-h-screen bg-gradient-to-b from-[#fdf2f8] to-[#faf5ff] flex items-center justify-center p-4">
-        <div className="max-w-md w-full bg-white/90 backdrop-blur-xl rounded-3xl p-8 shadow-2xl text-center border border-white">
-          <div className="mx-auto mb-4 grid h-16 w-16 place-items-center rounded-2xl bg-emerald-100 text-3xl">
-            🎉
+        <div className="max-w-lg w-full bg-white/95 backdrop-blur-xl rounded-3xl p-8 shadow-2xl text-center border border-white space-y-5 animate-rise">
+          <div className="mx-auto grid h-20 w-20 place-items-center rounded-3xl bg-gradient-to-br from-emerald-400 to-teal-500 text-white text-4xl shadow-lg shadow-emerald-200">
+            ✍️
           </div>
-          <h2 className="text-2xl font-bold text-stone-800">Formulário Enviado!</h2>
-          <p className="mt-2 text-sm text-stone-600">
-            Recebemos todas as informações da sua festa, <b>{name}</b>! Já estamos preparando o seu
-            orçamento com muito carinho.
+          <div>
+            <h2 className="text-2xl font-bold text-stone-800">Contrato Gerado com Sucesso!</h2>
+            <p className="mt-2 text-sm text-stone-600">
+              Recebemos seus dados, <b>{name}</b>! O seu cadastro e o <b>Contrato de Locação</b> para a festa com o tema <b>{theme}</b> já foram gerados automaticamente no sistema da <b>{companyName}</b>.
+            </p>
+          </div>
+
+          <div className="rounded-2xl bg-gradient-to-br from-pink-50 to-purple-50 p-4 text-xs text-left border border-pink-100/80 space-y-2">
+            <div className="flex justify-between border-b border-pink-100/60 pb-1.5">
+              <span className="text-stone-500">Contratante:</span>
+              <span className="font-semibold text-stone-800">{name}</span>
+            </div>
+            <div className="flex justify-between border-b border-pink-100/60 pb-1.5">
+              <span className="text-stone-500">WhatsApp:</span>
+              <span className="font-semibold text-stone-800">{whatsapp}</span>
+            </div>
+            <div className="flex justify-between border-b border-pink-100/60 pb-1.5">
+              <span className="text-stone-500">Tema:</span>
+              <span className="font-semibold text-stone-800">{theme}</span>
+            </div>
+            <div className="flex justify-between border-b border-pink-100/60 pb-1.5">
+              <span className="text-stone-500">Data da Festa:</span>
+              <span className="font-semibold text-stone-800">{fmtDate(eventDate)}</span>
+            </div>
+            <div className="flex justify-between pt-0.5">
+              <span className="text-stone-500">Status do Contrato:</span>
+              <span className="font-bold text-amber-600">Aguardando Assinatura Digital</span>
+            </div>
+          </div>
+
+          <div className="space-y-2.5 pt-2">
+            {signUrl && (
+              <a
+                href={signUrl}
+                className="w-full inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-pink-500 to-rose-500 py-3.5 px-5 text-sm font-bold text-white shadow-lg shadow-pink-200 hover:opacity-95 transition"
+              >
+                ✍️ Assinar Meu Contrato Online Agora
+              </a>
+            )}
+
+            {companyContact && (
+              <a
+                href={waLink(
+                  companyContact,
+                  `Olá! Acabei de enviar o formulário e gerar o contrato para a festa *${theme}* (${name}). 💕`
+                )}
+                target="_blank"
+                rel="noreferrer"
+                className="w-full inline-flex items-center justify-center gap-2 rounded-2xl bg-emerald-500 py-3 px-5 text-xs font-bold text-white shadow-md shadow-emerald-200 hover:bg-emerald-600 transition"
+              >
+                💬 Falar com a Empresa no WhatsApp
+              </a>
+            )}
+          </div>
+
+          <p className="text-[11px] text-stone-400">
+            A equipe da {companyName} também entrará em contato pelo seu WhatsApp {whatsapp} para alinhar todos os detalhes! ✨
           </p>
-          <div className="mt-6 rounded-2xl bg-pink-50 p-4 text-xs text-pink-700">
-            Entraremos em contato pelo seu WhatsApp <b>{whatsapp}</b> em breve 💕
-          </div>
         </div>
       </div>
     );
