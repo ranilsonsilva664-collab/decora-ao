@@ -4,15 +4,22 @@ import { db } from "./firebase";
 import type {
   Client,
   PartyTheme,
+  InventoryItem,
+  Kit,
+  EventModel,
+  CalendarEvent,
   Quote,
   Contract,
-  CalendarEvent,
   Transaction,
   MessageTemplate,
+  CompanySettings,
+  PublicFormSubmission,
+  ActionLog,
   TenantData,
   Tenant
 } from "./types";
 import { seedTemplates } from "./seed";
+import { uid } from "./format";
 
 const DEFAULT_CONTRACT_RULES =
   "*Regras de uso:*\n" +
@@ -21,18 +28,68 @@ const DEFAULT_CONTRACT_RULES =
   "• Não é permitido o uso de fitas, colas ou objetos que danifiquem as peças.\n\n" +
   "*Regras de devolução:*\n" +
   "• A devolução deve ocorrer na data e horário acordados, com as peças limpas.\n" +
-  "• Peças danificadas ou perdidas serão cobradas conforme valor de reposição.\n" +
-  "• O sinal não é reembolsável em caso de cancelamento com menos de 7 dias.";
+  "• Peças danificadas ou perdidas serão cobradas conforme valor de reposição especificado.\n" +
+  "• O sinal de reserva não é reembolsável em caso de cancelamento com menos de 7 dias.";
+
+export const DEFAULT_CATEGORIES: string[] = [
+  "Painéis",
+  "Cilindros",
+  "Capas",
+  "Mesas",
+  "Boleiras",
+  "Doceiras",
+  "Bandejas",
+  "Vasos",
+  "Suportes",
+  "Tapetes",
+  "Displays",
+  "Números LED",
+  "Flores",
+  "Balões",
+  "Personagens",
+  "Estruturas",
+  "Kits",
+  "Acessórios",
+  "Outros",
+];
+
+const DEFAULT_COMPANY_SETTINGS: CompanySettings = {
+  name: "RAYDECOR Pegue e Monte",
+  tradeName: "RAYDECOR",
+  cnpjCpf: "",
+  phone: "",
+  whatsapp: "",
+  email: "",
+  cep: "",
+  address: "",
+  number: "",
+  complement: "",
+  neighborhood: "",
+  city: "",
+  state: "",
+  pixKey: "",
+  pixType: "Chave Aleatória",
+  bankName: "",
+  ownerName: "",
+  logo: "https://res.cloudinary.com/dmxeqe939/image/upload/v1785097595/ChatGPT_Image_26_de_jul._de_2026_17_25_48_ilxojd.png",
+  terms: DEFAULT_CONTRACT_RULES,
+};
 
 const DEFAULT_DATA: TenantData = {
   clients: [],
   themes: [],
   inventoryItems: [],
+  kits: [],
+  eventsList: [],
+  events: [],
   quotes: [],
   contracts: [],
-  events: [],
   transactions: [],
   templates: seedTemplates,
+  categories: DEFAULT_CATEGORIES,
+  companySettings: DEFAULT_COMPANY_SETTINGS,
+  formSubmissions: [],
+  actionLogs: [],
   contractRules: DEFAULT_CONTRACT_RULES,
   catalogEnabled: false,
 };
@@ -46,13 +103,21 @@ interface State extends TenantData {
 
   setClients: (v: Client[]) => void;
   setThemes: (v: PartyTheme[]) => void;
-  setInventoryItems: (v: any[]) => void;
+  setInventoryItems: (v: InventoryItem[]) => void;
+  setKits: (v: Kit[]) => void;
+  setEventsList: (v: EventModel[]) => void;
+  setEvents: (v: CalendarEvent[]) => void;
   setQuotes: (v: Quote[]) => void;
   setContracts: (v: Contract[]) => void;
-  setEvents: (v: CalendarEvent[]) => void;
   setTransactions: (v: Transaction[]) => void;
+  setTemplates: (v: MessageTemplate[]) => void;
+  setCategories: (v: string[]) => void;
+  setCompanySettings: (v: CompanySettings) => void;
+  setFormSubmissions: (v: PublicFormSubmission[]) => void;
+  setActionLogs: (v: ActionLog[]) => void;
   setContractRules: (v: string) => void;
   setCatalogEnabled: (v: boolean) => void;
+  logAction: (action: string, details: string) => void;
 }
 
 const Ctx = createContext<State | null>(null);
@@ -82,6 +147,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         setData({
           ...DEFAULT_DATA, // ensure all fields exist
           ...firestoreData,
+          categories: firestoreData.categories && firestoreData.categories.length > 0 ? firestoreData.categories : DEFAULT_CATEGORIES,
+          companySettings: firestoreData.companySettings ? { ...DEFAULT_COMPANY_SETTINGS, ...firestoreData.companySettings } : DEFAULT_COMPANY_SETTINGS,
+          kits: firestoreData.kits || [],
+          eventsList: firestoreData.eventsList || [],
+          formSubmissions: firestoreData.formSubmissions || [],
+          actionLogs: firestoreData.actionLogs || [],
         });
       } else {
         // If data doc doesn't exist, initialize it
@@ -120,7 +191,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       if (tenant.status !== "active") return { success: false, error: "Acesso bloqueado." };
       
       if (tenant.isTest && tenant.expiresAt && new Date() > new Date(tenant.expiresAt)) {
-        // Automatically block them in firestore for future? Maybe not strictly necessary right here, just block login.
         return { success: false, error: "O período de teste (24h) expirou." };
       }
 
@@ -153,6 +223,18 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setDoc(doc(db, "tenant_data", tenantId), { [key]: value }, { merge: true }).catch(console.error);
   };
 
+  const logAction = (action: string, details: string) => {
+    const newLog: ActionLog = {
+      id: uid(),
+      timestamp: new Date().toISOString(),
+      action,
+      details,
+      user: tenantId || "Sistema",
+    };
+    const updated = [newLog, ...(data.actionLogs || [])].slice(0, 100);
+    updateData("actionLogs", updated);
+  };
+
   return (
     <Ctx.Provider
       value={{
@@ -165,12 +247,20 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         setClients: (v) => updateData("clients", v),
         setThemes: (v) => updateData("themes", v),
         setInventoryItems: (v) => updateData("inventoryItems", v),
+        setKits: (v) => updateData("kits", v),
+        setEventsList: (v) => updateData("eventsList", v),
+        setEvents: (v) => updateData("events", v),
         setQuotes: (v) => updateData("quotes", v),
         setContracts: (v) => updateData("contracts", v),
-        setEvents: (v) => updateData("events", v),
         setTransactions: (v) => updateData("transactions", v),
+        setTemplates: (v) => updateData("templates", v),
+        setCategories: (v) => updateData("categories", v),
+        setCompanySettings: (v) => updateData("companySettings", v),
+        setFormSubmissions: (v) => updateData("formSubmissions", v),
+        setActionLogs: (v) => updateData("actionLogs", v),
         setContractRules: (v) => updateData("contractRules", v),
         setCatalogEnabled: (v) => updateData("catalogEnabled", v),
+        logAction,
       }}
     >
       {children}
