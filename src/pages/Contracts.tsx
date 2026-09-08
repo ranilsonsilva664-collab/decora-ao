@@ -3,7 +3,7 @@ import { Card, SectionTitle, Button, Modal, Field, Input, Select, Badge } from "
 import { Icon } from "../components/icons";
 import { useStore } from "../lib/store";
 import { brl, fmtDate, uid } from "../lib/format";
-import { copy, waLink } from "../lib/helpers";
+import { copy, waLink, normalizeWaPhone } from "../lib/helpers";
 import { useToast } from "../components/Toast";
 import type { Contract, ContractStatus } from "../lib/types";
 import { downloadContractPdf } from "../utils/contractPdf";
@@ -14,6 +14,7 @@ export default function Contracts() {
     contracts,
     setContracts,
     clients,
+    setClients,
     themes,
     companySettings,
     contractRules,
@@ -33,6 +34,7 @@ export default function Contracts() {
     sanitizeContract({
       id: uid(),
       clientName: "",
+      whatsapp: "",
       cpf: "",
       partyDate: new Date().toISOString().slice(0, 10),
       theme: "",
@@ -182,10 +184,18 @@ export default function Contracts() {
   // REQUISITO: ENVIAR LINK PARA O CLIENTE ASSINAR DIGITALMENTE
   const openShareModal = (item: Contract) => {
     const client = clients.find(
-      (cl) => cl.name.toLowerCase() === item.clientName.toLowerCase()
+      (cl) =>
+        (item.clientId && cl.id === item.clientId) ||
+        (item.cpf && cl.cpf && cl.cpf.replace(/\D/g, "") === item.cpf.replace(/\D/g, "")) ||
+        cl.name.trim().toLowerCase() === item.clientName.trim().toLowerCase()
     );
     const signUrl = getSignLink(item.id);
-    const phone = client?.whatsapp || "";
+    const phone =
+      item.whatsapp ||
+      (item as any).clientPhone ||
+      client?.whatsapp ||
+      client?.phone ||
+      "";
     setSharePhone(phone);
     setShareContract(item);
     setShareMessage(
@@ -199,6 +209,40 @@ export default function Contracts() {
       `${signUrl}\n\n` +
       `Qualquer dúvida estamos à disposição! ✨`
     );
+  };
+
+  const handleOpenWhatsapp = () => {
+    const clean = normalizeWaPhone(sharePhone);
+    if (!clean) {
+      toast("Por favor, informe o WhatsApp da cliente com DDD.");
+      return;
+    }
+
+    if (shareContract) {
+      // Salva o WhatsApp atualizado no contrato
+      const updatedContracts = contracts.map((ct) =>
+        ct.id === shareContract.id
+          ? { ...ct, whatsapp: sharePhone, clientPhone: sharePhone }
+          : ct
+      );
+      setContracts(updatedContracts);
+
+      // Sincroniza também no cadastro da cliente se ela existir
+      const client = clients.find(
+        (cl) =>
+          (shareContract.clientId && cl.id === shareContract.clientId) ||
+          (shareContract.cpf && cl.cpf && cl.cpf.replace(/\D/g, "") === shareContract.cpf.replace(/\D/g, "")) ||
+          cl.name.trim().toLowerCase() === shareContract.clientName.trim().toLowerCase()
+      );
+      if (client && !client.whatsapp) {
+        setClients(
+          clients.map((cl) => (cl.id === client.id ? { ...cl, whatsapp: sharePhone } : cl))
+        );
+      }
+    }
+
+    const url = waLink(sharePhone, shareMessage);
+    window.open(url, "_blank");
   };
 
   return (
@@ -354,19 +398,22 @@ export default function Contracts() {
         wide
       >
         <div className="space-y-4 mt-2">
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-4 sm:grid-cols-3">
             <Field label="Nome da Cliente">
               <Input
                 list="cclist"
                 value={c.clientName}
                 onChange={(e) => {
                   const name = e.target.value;
-                  const found = clients.find((cl) => cl.name.toLowerCase() === name.toLowerCase());
+                  const found = clients.find(
+                    (cl) => cl.name.trim().toLowerCase() === name.trim().toLowerCase()
+                  );
                   setC({
                     ...c,
                     clientName: name,
                     cpf: found?.cpf || c.cpf,
                     clientId: found?.id || c.clientId,
+                    whatsapp: found?.whatsapp || found?.phone || c.whatsapp,
                   });
                 }}
                 placeholder="Selecione ou digite a cliente"
@@ -376,6 +423,14 @@ export default function Contracts() {
                   <option key={cl.id} value={cl.name} />
                 ))}
               </datalist>
+            </Field>
+
+            <Field label="WhatsApp da Cliente">
+              <Input
+                value={c.whatsapp || ""}
+                onChange={(e) => setC({ ...c, whatsapp: e.target.value })}
+                placeholder="(00) 00000-0000"
+              />
             </Field>
 
             <Field label="CPF da Cliente">
@@ -551,6 +606,9 @@ export default function Contracts() {
                 onChange={(e) => setSharePhone(e.target.value)}
                 placeholder="(00) 00000-0000"
               />
+              <p className="mt-1 text-[11px] text-stone-500">
+                💡 Informe com o DDD (ex: 81 99999-9999 ou 11 98888-7777). O código do país (+55) é inserido automaticamente para abrir direto no WhatsApp!
+              </p>
             </Field>
 
             <Field label="Link de Assinatura Online">
@@ -567,7 +625,7 @@ export default function Contracts() {
                     toast("Link copiado com sucesso! 📋");
                   }}
                 >
-                  Copiar
+                  Copiar Link
                 </Button>
               </div>
             </Field>
@@ -579,19 +637,28 @@ export default function Contracts() {
                 onChange={(e) => setShareMessage(e.target.value)}
                 className="w-full rounded-2xl border border-stone-200 bg-white p-3 text-xs text-stone-700 outline-none focus:ring-2 focus:ring-pink-300 font-sans leading-relaxed"
               />
+              <div className="mt-1 flex justify-end">
+                <Button
+                  variant="ghost"
+                  className="!py-1 !px-2.5 text-[11px] text-stone-600"
+                  onClick={async () => {
+                    await copy(shareMessage);
+                    toast("Mensagem copiada para o WhatsApp! 💬");
+                  }}
+                >
+                  📋 Copiar Mensagem
+                </Button>
+              </div>
             </Field>
 
             <div className="pt-2 flex flex-col sm:flex-row gap-2.5">
-              <a
-                href={waLink(sharePhone, shareMessage)}
-                target="_blank"
-                rel="noreferrer"
-                className="flex-1"
+              <Button
+                variant="wa"
+                className="flex-1 !py-3 text-xs font-bold justify-center shadow-md shadow-emerald-200"
+                onClick={handleOpenWhatsapp}
               >
-                <Button variant="wa" className="w-full !py-3 text-xs font-bold justify-center">
-                  <Icon.wa className="h-4 w-4" /> Abrir no WhatsApp da Cliente
-                </Button>
-              </a>
+                <Icon.wa className="h-4 w-4" /> Abrir no WhatsApp da Cliente
+              </Button>
 
               <Button
                 variant="gold"

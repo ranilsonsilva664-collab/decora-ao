@@ -34,6 +34,8 @@ export function sanitizeContract(c: Partial<Contract>): Contract {
     id: (c.id || Math.random().toString(36).slice(2, 10)).trim(),
     clientId: c.clientId || "",
     clientName: (c.clientName || "").trim(),
+    whatsapp: (c.whatsapp || c.clientPhone || "").trim(),
+    clientPhone: (c.clientPhone || c.whatsapp || "").trim(),
     cpf: (c.cpf || "").trim(),
     quoteId: c.quoteId || "",
     eventId: c.eventId || "",

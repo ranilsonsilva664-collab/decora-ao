@@ -3,6 +3,7 @@ import { doc, getDoc, setDoc } from "firebase/firestore";
 import { db } from "../lib/firebase";
 import type { TenantData, Contract, CompanySettings } from "../lib/types";
 import { brl, fmtDate } from "../lib/format";
+import { waLink } from "../lib/helpers";
 import { downloadContractPdf } from "../utils/contractPdf";
 import { sanitizeContract, sanitizeForFirestore } from "../lib/firestoreUtils";
 
@@ -267,11 +268,12 @@ export default function PublicSign({
             >
               🔄 Recarregar Página
             </button>
-            {companySettings?.phone && (
+            {(companySettings?.whatsapp || companySettings?.phone) && (
               <a
-                href={`https://wa.me/55${companySettings.phone.replace(/\D/g, "")}?text=${encodeURIComponent(
+                href={waLink(
+                  companySettings.whatsapp || companySettings.phone || "",
                   "Olá! Tentei acessar o link de assinatura do meu contrato mas apareceu indisponível. Poderia me enviar novamente?"
-                )}`}
+                )}
                 target="_blank"
                 rel="noreferrer"
                 className="w-full rounded-xl bg-emerald-500 py-2.5 text-xs font-bold text-white shadow-md shadow-emerald-200 hover:bg-emerald-600 transition inline-block text-center"
@@ -335,11 +337,12 @@ export default function PublicSign({
                 {downloadingPdf ? "Gerando PDF..." : "📥 Baixar Minha Cópia do Contrato (PDF)"}
               </button>
 
-              {companySettings?.phone && (
+              {(companySettings?.whatsapp || companySettings?.phone) && (
                 <a
-                  href={`https://wa.me/55${companySettings.phone.replace(/\D/g, "")}?text=${encodeURIComponent(
+                  href={waLink(
+                    companySettings.whatsapp || companySettings.phone || "",
                     `Olá! Acabei de assinar digitalmente o contrato da minha festa (${contract.theme}). Muito obrigada!`
-                  )}`}
+                  )}
                   target="_blank"
                   rel="noreferrer"
                   className="w-full rounded-2xl bg-emerald-500 py-3.5 text-sm font-bold text-white shadow-lg shadow-emerald-200 hover:bg-emerald-600 inline-block text-center transition"

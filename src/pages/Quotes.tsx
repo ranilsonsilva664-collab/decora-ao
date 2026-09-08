@@ -214,12 +214,17 @@ export default function Quotes() {
 
   // REQUISITO 18: TRANSFORMAR ORÇAMENTO EM CONTRATO
   const transformToContract = (item: Quote) => {
-    const client = clients.find((c) => c.name.toLowerCase() === item.clientName.toLowerCase());
+    const client = clients.find(
+      (c) =>
+        (item.clientId && c.id === item.clientId) ||
+        c.name.trim().toLowerCase() === (item.clientName || "").trim().toLowerCase()
+    );
 
     const newContract: Contract = sanitizeContract({
       id: uid(),
       clientId: item.clientId || client?.id || "",
       clientName: item.clientName || "",
+      whatsapp: client?.whatsapp || client?.phone || "",
       cpf: client?.cpf || "",
       quoteId: item.id || "",
       eventId: item.eventId || "",

@@ -210,6 +210,8 @@ export interface Contract {
   id: string;
   clientId?: string;
   clientName: string;
+  whatsapp?: string;
+  clientPhone?: string;
   cpf: string;
   eventId?: string;
   quoteId?: string;
