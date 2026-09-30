@@ -63,6 +63,8 @@ export default function Quotes() {
     kits,
     contracts,
     setContracts,
+    events,
+    setEvents,
     companySettings,
     contractRules,
     logAction,
@@ -256,11 +258,32 @@ export default function Quotes() {
     // Add new contract
     setContracts([newContract, ...contracts]);
 
+    // REQUISITO: Automaticamente ir para a agenda na data preenchida
+    if (newContract.partyDate) {
+      const alreadyScheduled = (events || []).some(
+        (ev) =>
+          ev.date === newContract.partyDate &&
+          ev.clientName.trim().toLowerCase() === newContract.clientName.trim().toLowerCase()
+      );
+      if (!alreadyScheduled) {
+        const calEv = {
+          id: uid(),
+          theme: newContract.theme || "Decoração Pegue e Monte",
+          clientName: newContract.clientName,
+          date: newContract.partyDate,
+          setupTime: newContract.pickupTime || "09:00",
+          pickupTime: newContract.pickupTime || "09:00",
+          returnTime: newContract.returnTime || "12:00",
+        };
+        setEvents([calEv, ...(events || [])]);
+      }
+    }
+
     logAction(
       "Orçamento Convertido em Contrato",
       `Orçamento de ${item.clientName} transformado no contrato #${newContract.id}`
     );
-    toast("✨ Orçamento transformado em Contrato com sucesso! Abra a aba de Contratos para visualizar.");
+    toast("✨ Contrato gerado e agendado no calendário com sucesso!");
   };
 
   const doCopy = async (item: Quote) => {

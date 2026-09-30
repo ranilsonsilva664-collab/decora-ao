@@ -2,6 +2,7 @@ import { initializeApp } from "firebase/app";
 import { getAnalytics, isSupported, Analytics } from "firebase/analytics";
 import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
+import { getAuth, signInAnonymously } from "firebase/auth";
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -27,3 +28,9 @@ export const db = initializeFirestore(app, {
 });
 
 export const storage = getStorage(app);
+export const auth = getAuth(app);
+
+// Authenticate anonymously so Firebase Storage and security rules allow access
+signInAnonymously(auth).catch((err) => {
+  console.warn("Aviso ao autenticar anonimamente no Firebase:", err);
+});

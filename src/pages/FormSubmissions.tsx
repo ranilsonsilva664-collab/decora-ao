@@ -14,6 +14,8 @@ export default function FormSubmissions() {
     setFormSubmissions,
     contracts,
     setContracts,
+    events,
+    setEvents,
     companySettings,
     contractRules,
     tenantId,
@@ -85,11 +87,33 @@ export default function FormSubmissions() {
     setFormSubmissions(
       safeSubmissions.map((s) => (s.id === sub.id ? { ...s, contractId } : s))
     );
+
+    // REQUISITO: Automaticamente ir para a agenda na data preenchida
+    if (newContract.partyDate) {
+      const alreadyScheduled = (events || []).some(
+        (ev) =>
+          ev.date === newContract.partyDate &&
+          ev.clientName.trim().toLowerCase() === newContract.clientName.trim().toLowerCase()
+      );
+      if (!alreadyScheduled) {
+        const calEv = {
+          id: uid(),
+          theme: newContract.theme || "Decoração Pegue e Monte",
+          clientName: newContract.clientName,
+          date: newContract.partyDate,
+          setupTime: newContract.pickupTime || "09:00",
+          pickupTime: newContract.pickupTime || "09:00",
+          returnTime: newContract.returnTime || "12:00",
+        };
+        setEvents([calEv, ...(events || [])]);
+      }
+    }
+
     logAction(
       "Contrato Gerado pelo Formulário",
       `Contrato #${newContract.id} gerado a partir do formulário de ${sub.clientName}`
     );
-    toast("Contrato gerado com sucesso! 📄");
+    toast("Contrato gerado e agendado no calendário com sucesso! 📄✨");
   };
 
   const saveEditedContract = () => {

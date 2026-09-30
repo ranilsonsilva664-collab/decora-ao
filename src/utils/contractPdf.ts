@@ -100,7 +100,11 @@ function generateNativeJsPdf(
   doc.setTextColor(60, 60, 60);
   doc.text(`Locadora: ${compName} | Resp: ${companySettings.ownerName || "A Gerência"}`, 14, y);
   y += 5;
-  doc.text(`Locatária: ${contract.clientName} | CPF: ${contract.cpf || "Não informado"}`, 14, y);
+  doc.text(
+    `Locatária: ${contract.clientName} | CPF: ${contract.cpf || "Não informado"} | WhatsApp: ${contract.whatsapp || contract.clientPhone || "Não informado"}`,
+    14,
+    y
+  );
 
   // 2. Cronograma
   y += 10;
@@ -314,6 +318,7 @@ export async function downloadContractPdf({
           <div><b style="color: #44403c;">RESPONSÁVEL:</b> ${companySettings.ownerName || "A Gerência"}</div>
           <div><b style="color: #44403c;">LOCATÁRIA:</b> ${contract.clientName}</div>
           <div><b style="color: #44403c;">CPF DA CLIENTE:</b> ${contract.cpf || "Não informado"}</div>
+          <div style="grid-column: span 2;"><b style="color: #44403c;">WHATSAPP DA CLIENTE:</b> ${contract.whatsapp || contract.clientPhone || "Não informado"}</div>
         </div>
       </div>
 

@@ -16,6 +16,8 @@ export default function Contracts() {
     clients,
     setClients,
     themes,
+    events,
+    setEvents,
     companySettings,
     contractRules,
     setContractRules,
@@ -66,9 +68,11 @@ export default function Contracts() {
 
   const contractText = (item: Contract) => {
     const signUrl = getSignLink(item.id);
+    const clientPhone = item.whatsapp || item.clientPhone || "";
     return (
       `📑 *CONTRATO DE LOCAÇÃO — ${companySettings.tradeName || "RAYDECOR"}*\n\n` +
       `👤 *Contratante:* ${item.clientName} (CPF ${item.cpf || "—"})\n` +
+      (clientPhone ? `📱 *WhatsApp:* ${clientPhone}\n` : "") +
       `🎉 *Tema:* ${item.theme} • Festa em ${fmtDate(item.partyDate)}\n` +
       `📦 *Retirada:* ${fmtDate(item.pickupDate || item.partyDate)}\n` +
       `↩️ *Devolução:* ${fmtDate(item.returnDate || item.partyDate)}\n\n` +
@@ -93,12 +97,34 @@ export default function Contracts() {
     });
     const updated = exists ? contracts.map((x) => (x.id === c.id ? sanitized : x)) : [sanitized, ...contracts];
     setContracts(updated);
+
+    // REQUISITO: Assim que o contrato for gerado ir automaticamente para agenda na data preenchida
+    if (sanitized.partyDate) {
+      const alreadyScheduled = (events || []).some(
+        (ev) =>
+          ev.date === sanitized.partyDate &&
+          ev.clientName.trim().toLowerCase() === sanitized.clientName.trim().toLowerCase()
+      );
+      if (!alreadyScheduled) {
+        const newCalendarEvent = {
+          id: uid(),
+          theme: sanitized.theme || "Decoração Pegue e Monte",
+          clientName: sanitized.clientName,
+          date: sanitized.partyDate,
+          setupTime: sanitized.pickupTime || "09:00",
+          pickupTime: sanitized.pickupTime || "09:00",
+          returnTime: sanitized.returnTime || "12:00",
+        };
+        setEvents([newCalendarEvent, ...(events || [])]);
+      }
+    }
+
     setOpen(false);
     logAction(
       exists ? "Contrato Atualizado" : "Novo Contrato Gerado",
       `${sanitized.clientName} - ${sanitized.theme} (${brl(sanitized.value)})`
     );
-    toast(exists ? "Contrato atualizado!" : "Contrato gerado com sucesso!");
+    toast(exists ? "Contrato atualizado!" : "Contrato gerado e agendado no calendário!");
   };
 
   // Canvas Handlers
@@ -276,9 +302,24 @@ export default function Contracts() {
                 <div className="flex items-start justify-between gap-2 mb-2">
                   <div>
                     <h3 className="font-bold text-stone-800 text-base">{item.clientName}</h3>
-                    <p className="text-xs text-stone-500">
-                      CPF: {item.cpf || "Não informado"} • Tema: {item.theme}
-                    </p>
+                    <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-stone-500 mt-0.5">
+                      <span>CPF: {item.cpf || "Não informado"}</span>
+                      <span>•</span>
+                      <span>Tema: <b>{item.theme}</b></span>
+                      {(item.whatsapp || item.clientPhone || client?.whatsapp) && (
+                        <>
+                          <span>•</span>
+                          <a
+                            href={waLink(item.whatsapp || item.clientPhone || client?.whatsapp || "", "")}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1 font-semibold text-emerald-600 hover:text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md"
+                          >
+                            <span>📱</span> {item.whatsapp || item.clientPhone || client?.whatsapp}
+                          </a>
+                        </>
+                      )}
+                    </div>
                   </div>
                   {item.signed ? (
                     <Badge color="green">✍️ Assinado</Badge>

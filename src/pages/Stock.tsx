@@ -107,13 +107,15 @@ export default function Stock({
   const [themeStatusFilter, setThemeStatusFilter] = useState<string>("Todos");
   const [openTheme, setOpenTheme] = useState(false);
   const [themeItem, setThemeItem] = useState<PartyTheme>(emptyTheme());
-  const [themePhotoType, setThemePhotoType] = useState<"emoji" | "upload">("emoji");
+  const [themePhotoType, setThemePhotoType] = useState<"emoji" | "upload" | "url">("emoji");
   const [themeUploading, setThemeUploading] = useState(false);
+  const [themePhotoUrlInput, setThemePhotoUrlInput] = useState("");
   const themeFileInputRef = useRef<HTMLInputElement>(null);
 
   // Item Modal State
   const [openItem, setOpenItem] = useState(false);
   const [item, setItem] = useState<InventoryItem>(emptyItem());
+  const [itemPhotoUrlInput, setItemPhotoUrlInput] = useState("");
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -197,13 +199,17 @@ export default function Stock({
         const p = currentPhotos[i];
         if (p.startsWith("data:image")) {
           try {
-            const fileName = `tenants/${tenantId}/stock/${item.id}/${uid()}.jpg`;
+            const fileName = `tenants/${tenantId || "default"}/stock/${item.id || uid()}/${uid()}.jpg`;
             const sRef = ref(storage, fileName);
-            await uploadString(sRef, p, "data_url");
-            const url = await getDownloadURL(sRef);
+            // Race with 5 second timeout to prevent infinite hang if network stalls
+            const uploadPromise = uploadString(sRef, p, "data_url").then(() => getDownloadURL(sRef));
+            const timeoutPromise = new Promise<string>((_, reject) =>
+              setTimeout(() => reject(new Error("Storage timeout")), 5000)
+            );
+            const url = await Promise.race([uploadPromise, timeoutPromise]);
             finalPhotos.push(url);
           } catch (storageErr) {
-            console.warn("Storage upload failed, keeping compressed base64 directly", storageErr);
+            console.warn("Storage upload fallback to compressed image", storageErr);
             finalPhotos.push(p);
           }
         } else {
@@ -211,7 +217,7 @@ export default function Stock({
         }
       }
 
-      // Cleanup removed photos
+      // Cleanup removed photos safely
       const existing = safeItems.find((x) => x.id === item.id);
       if (existing) {
         const oldPhotos = existing.photos || (existing.photo ? [existing.photo] : []);
@@ -220,7 +226,7 @@ export default function Stock({
             try {
               await deleteObject(ref(storage, old));
             } catch (e) {
-              console.error("Erro ao deletar foto antiga", e);
+              console.warn("Aviso ao limpar foto antiga:", e);
             }
           }
         }
@@ -228,6 +234,7 @@ export default function Stock({
 
       const finalItem: InventoryItem = {
         ...item,
+        name: item.name.trim(),
         quantity: totalQty,
         inMaintenance: Math.max(0, Number(item.inMaintenance) || 0),
         damaged: Math.max(0, Number(item.damaged) || 0),
@@ -253,10 +260,10 @@ export default function Stock({
         exists ? "Peça Atualizada" : "Nova Peça Cadastrada",
         `${finalItem.code || ""} - ${finalItem.name} (${finalItem.quantity} un.)`
       );
-      toast(exists ? "Peça atualizada no acervo!" : "Peça adicionada ao acervo!");
+      toast(exists ? "Peça e fotos atualizadas no acervo!" : "Peça adicionada ao acervo com sucesso!");
     } catch (err) {
-      console.error(err);
-      toast("Erro ao salvar imagens no banco de dados.");
+      console.error("Erro ao salvar peça:", err);
+      toast("Erro ao salvar dados no acervo. Tente novamente.");
     } finally {
       setSaving(false);
     }
@@ -446,18 +453,21 @@ export default function Stock({
     setThemeUploading(true);
     toast("Otimizando foto do tema...");
     try {
-      const compressed = await compressImage(file, 900, 0.82);
+      const compressed = await compressImage(file, 600, 0.65);
       if (compressed.startsWith("data:image")) {
         try {
-          const fileName = `tenants/${tenantId}/themes/${themeItem.id || uid()}/${uid()}.jpg`;
+          const fileName = `tenants/${tenantId || "default"}/themes/${themeItem.id || uid()}/${uid()}.jpg`;
           const sRef = ref(storage, fileName);
-          await uploadString(sRef, compressed, "data_url");
-          const url = await getDownloadURL(sRef);
+          const uploadPromise = uploadString(sRef, compressed, "data_url").then(() => getDownloadURL(sRef));
+          const timeoutPromise = new Promise<string>((_, reject) =>
+            setTimeout(() => reject(new Error("Storage timeout")), 5000)
+          );
+          const url = await Promise.race([uploadPromise, timeoutPromise]);
           setThemeItem((prev) => ({ ...prev, photo: url }));
           toast("Foto do tema carregada!");
         } catch {
           setThemeItem((prev) => ({ ...prev, photo: compressed }));
-          toast("Foto carregada!");
+          toast("Foto carregada com sucesso!");
         }
       }
     } catch {
@@ -470,12 +480,27 @@ export default function Stock({
   const saveTheme = () => {
     if (!themeItem.name.trim()) return toast("Informe o nome do tema");
     const safeT = themes || [];
-    const exists = safeT.some((x) => x.id === themeItem.id);
-    const updated = exists ? safeT.map((x) => (x.id === themeItem.id ? themeItem : x)) : [themeItem, ...safeT];
+    const sanitizedTheme: PartyTheme = {
+      id: themeItem.id || uid(),
+      name: themeItem.name.trim(),
+      photo: themeItem.photo || "🎀",
+      pieces: Math.max(0, Number(themeItem.pieces) || 0),
+      invested: Math.max(0, Number(themeItem.invested) || 0),
+      rentals: Math.max(0, Number(themeItem.rentals) || 0),
+      revenue: Math.max(0, Number(themeItem.revenue) || 0),
+      status: themeItem.status || "Disponível",
+    };
+    const exists = safeT.some((x) => x.id === sanitizedTheme.id);
+    const updated = exists
+      ? safeT.map((x) => (x.id === sanitizedTheme.id ? sanitizedTheme : x))
+      : [sanitizedTheme, ...safeT];
     setThemes(updated);
     setOpenTheme(false);
-    logAction(exists ? "Tema Atualizado" : "Novo Tema Cadastrado", `${themeItem.name} (${themeItem.pieces || 0} peças)`);
-    toast(exists ? "Tema atualizado com sucesso!" : "Novo tema cadastrado no acervo!");
+    logAction(
+      exists ? "Tema Atualizado" : "Novo Tema Cadastrado",
+      `${sanitizedTheme.name} (${sanitizedTheme.pieces} peças)`
+    );
+    toast(exists ? "Tema atualizado com sucesso! ✨" : "Novo tema cadastrado no acervo! 🎀");
   };
 
   const deleteTheme = (id: string) => {
@@ -1369,12 +1394,19 @@ export default function Stock({
                 ).map((p, i) => (
                   <div
                     key={i}
-                    className="relative aspect-square rounded-xl bg-stone-100 overflow-hidden border border-stone-200"
+                    className="relative aspect-square rounded-xl bg-stone-100 overflow-hidden border border-stone-200 group"
                   >
                     <img src={p} alt="Upload" className="h-full w-full object-cover" />
+                    {i === 0 && (
+                      <span className="absolute bottom-1 left-1 bg-black/70 text-[9px] font-bold text-white px-1.5 py-0.5 rounded">
+                        Capa
+                      </span>
+                    )}
                     <button
+                      type="button"
                       onClick={() => removePhoto(i)}
                       disabled={saving}
+                      title="Remover foto"
                       className="absolute top-1 right-1 h-6 w-6 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-red-500 transition disabled:opacity-50"
                     >
                       &times;
@@ -1399,11 +1431,37 @@ export default function Stock({
                     ) : (
                       <>
                         <Icon.plus className="h-5 w-5 mb-1" />
-                        <span className="text-[10px] font-semibold">Adicionar</span>
+                        <span className="text-[10px] font-semibold">Galeria</span>
                       </>
                     )}
                   </button>
                 )}
+              </div>
+
+              {/* Paste direct Image URL option */}
+              <div className="flex gap-2 pt-1">
+                <Input
+                  placeholder="Ou cole o link da foto (URL)..."
+                  value={itemPhotoUrlInput}
+                  onChange={(e) => setItemPhotoUrlInput(e.target.value)}
+                  className="text-xs"
+                />
+                <Button
+                  type="button"
+                  variant="soft"
+                  className="!py-1.5 text-xs whitespace-nowrap"
+                  onClick={() => {
+                    const url = itemPhotoUrlInput.trim();
+                    if (!url) return;
+                    const current = item.photos || (item.photo ? [item.photo] : []);
+                    if (current.length >= 6) return toast("Máximo de 6 fotos atingido");
+                    setItem({ ...item, photos: [...current, url], photo: item.photo || url });
+                    setItemPhotoUrlInput("");
+                    toast("Foto adicionada via link!");
+                  }}
+                >
+                  + Adicionar URL
+                </Button>
               </div>
             </div>
           </Field>
@@ -1675,7 +1733,18 @@ export default function Stock({
                     : "bg-white border-stone-200 text-stone-600 hover:bg-stone-50"
                 }`}
               >
-                📷 Enviar Foto Real
+                📷 Enviar Foto
+              </button>
+              <button
+                type="button"
+                onClick={() => setThemePhotoType("url")}
+                className={`flex-1 py-2 rounded-xl text-xs font-bold border transition ${
+                  themePhotoType === "url"
+                    ? "bg-pink-50 border-pink-300 text-pink-700 shadow-sm"
+                    : "bg-white border-stone-200 text-stone-600 hover:bg-stone-50"
+                }`}
+              >
+                🔗 Link URL
               </button>
             </div>
 
@@ -1696,7 +1765,7 @@ export default function Stock({
                   </button>
                 ))}
               </div>
-            ) : (
+            ) : themePhotoType === "upload" ? (
               <div className="flex items-center gap-4 p-4 bg-stone-50 rounded-2xl border border-stone-200">
                 <div className="h-20 w-20 rounded-2xl bg-white border border-stone-200 overflow-hidden grid place-items-center shrink-0">
                   {themeItem.photo && (themeItem.photo.startsWith("http") || themeItem.photo.startsWith("data:")) ? (
@@ -1723,6 +1792,37 @@ export default function Stock({
                     {themeUploading ? "Enviando..." : "Selecionar Foto da Galeria"}
                   </Button>
                   <p className="text-[11px] text-stone-400 mt-1">Formatos JPG, PNG ou WebP. Compressão automática.</p>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center gap-3 p-4 bg-stone-50 rounded-2xl border border-stone-200">
+                <div className="h-16 w-16 rounded-2xl bg-white border border-stone-200 overflow-hidden grid place-items-center shrink-0">
+                  {themeItem.photo && themeItem.photo.startsWith("http") ? (
+                    <img src={themeItem.photo} alt="Prévia" className="h-full w-full object-cover" />
+                  ) : (
+                    <span className="text-2xl">🔗</span>
+                  )}
+                </div>
+                <div className="flex-1 flex gap-2">
+                  <Input
+                    placeholder="Cole o link da foto (URL)..."
+                    value={themePhotoUrlInput}
+                    onChange={(e) => setThemePhotoUrlInput(e.target.value)}
+                    className="text-xs"
+                  />
+                  <Button
+                    type="button"
+                    variant="soft"
+                    className="!py-2 text-xs whitespace-nowrap"
+                    onClick={() => {
+                      if (!themePhotoUrlInput.trim()) return;
+                      setThemeItem({ ...themeItem, photo: themePhotoUrlInput.trim() });
+                      setThemePhotoUrlInput("");
+                      toast("Foto do tema aplicada!");
+                    }}
+                  >
+                    Aplicar
+                  </Button>
                 </div>
               </div>
             )}

@@ -17,7 +17,7 @@ const empty = (): CalendarEvent => ({
 });
 
 export default function Calendar() {
-  const { events, setEvents, themes, clients } = useStore();
+  const { events, setEvents, contracts, themes, clients } = useStore();
   const toast = useToast();
   const [cursor, setCursor] = useState(new Date());
   const [open, setOpen] = useState(false);
@@ -28,6 +28,36 @@ export default function Calendar() {
   const firstDay = new Date(year, month, 1).getDay();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
 
+  // Combina eventos manuais com todos os contratos gerados automaticamente
+  const allCalendarEvents = useMemo(() => {
+    const list: (CalendarEvent & { isContract?: boolean })[] = [
+      ...events.map((ev) => ({ ...ev, isContract: false })),
+    ];
+
+    (contracts || []).forEach((c) => {
+      if (!c.partyDate) return;
+      const alreadyIncluded = list.some(
+        (ev) =>
+          ev.date === c.partyDate &&
+          ev.clientName.trim().toLowerCase() === c.clientName.trim().toLowerCase()
+      );
+      if (!alreadyIncluded) {
+        list.push({
+          id: `contract-${c.id}`,
+          theme: c.theme || "Decoração Pegue e Monte",
+          clientName: c.clientName,
+          date: c.partyDate,
+          setupTime: c.pickupTime || "09:00",
+          pickupTime: c.pickupTime || "09:00",
+          returnTime: c.returnTime || "12:00",
+          isContract: true,
+        });
+      }
+    });
+
+    return list;
+  }, [events, contracts]);
+
   const cells = useMemo(() => {
     const arr: (number | null)[] = [];
     for (let i = 0; i < firstDay; i++) arr.push(null);
@@ -37,13 +67,13 @@ export default function Calendar() {
 
   const eventsOn = (day: number) => {
     const ds = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-    return events.filter((ev) => ev.date === ds);
+    return allCalendarEvents.filter((ev) => ev.date === ds);
   };
 
   const conflict = useMemo(() => {
     if (!e.theme || !e.date) return false;
-    return events.some((ev) => ev.id !== e.id && ev.date === e.date && ev.theme === e.theme);
-  }, [e, events]);
+    return allCalendarEvents.some((ev) => ev.id !== e.id && ev.date === e.date && ev.theme === e.theme);
+  }, [e, allCalendarEvents]);
 
   const save = () => {
     if (!e.theme || !e.date) return toast("Informe tema e data");
@@ -55,7 +85,7 @@ export default function Calendar() {
   };
 
   const todayStr = new Date().toISOString().slice(0, 10);
-  const monthEvents = events
+  const monthEvents = allCalendarEvents
     .filter((ev) => { const d = new Date(ev.date); return d.getMonth() === month && d.getFullYear() === year; })
     .sort((a, b) => a.date.localeCompare(b.date));
 

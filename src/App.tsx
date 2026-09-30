@@ -37,11 +37,11 @@ export type Page =
   | "company"
   | "messages";
 
-// Requisito 34: Menu Principal
 const MAIN_NAV: { id: Page; label: string; icon: (p: { className?: string }) => React.ReactNode }[] = [
   { id: "dashboard", label: "Dashboard", icon: Icon.dashboard },
   { id: "clients", label: "Clientes", icon: Icon.clients },
-  { id: "stock", label: "Acervo", icon: Icon.inventory },
+  { id: "stock", label: "Acervo de Peças", icon: Icon.inventory },
+  { id: "inventory", label: "Temas do Acervo", icon: () => <span className="text-base">🎀</span> },
   { id: "quotes", label: "Orçamentos", icon: Icon.quote },
   { id: "contracts", label: "Contratos", icon: Icon.contract },
 ];
@@ -112,9 +112,9 @@ function Shell() {
       case "clients":
         return <Clients />;
       case "stock":
-        return <Stock initialTab="items" />;
+        return <Stock key="stock-items" initialTab="items" />;
       case "inventory":
-        return <Stock initialTab="themes" />;
+        return <Stock key="stock-themes" initialTab="themes" />;
       case "quotes":
         return <Quotes />;
       case "contracts":

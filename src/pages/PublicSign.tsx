@@ -4,7 +4,6 @@ import { db } from "../lib/firebase";
 import type { TenantData, Contract, CompanySettings } from "../lib/types";
 import { brl, fmtDate } from "../lib/format";
 import { waLink } from "../lib/helpers";
-import { downloadContractPdf } from "../utils/contractPdf";
 import { sanitizeContract, sanitizeForFirestore } from "../lib/firestoreUtils";
 
 export default function PublicSign({
@@ -24,7 +23,6 @@ export default function PublicSign({
   const [signerName, setSignerName] = useState("");
   const [saving, setSaving] = useState(false);
   const [signedSuccess, setSignedSuccess] = useState(false);
-  const [downloadingPdf, setDownloadingPdf] = useState(false);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const drawing = useRef(false);
@@ -314,29 +312,6 @@ export default function PublicSign({
             </div>
 
             <div className="pt-2 flex flex-col gap-2.5">
-              <button
-                type="button"
-                disabled={downloadingPdf}
-                onClick={async () => {
-                  try {
-                    setDownloadingPdf(true);
-                    await downloadContractPdf({
-                      contract,
-                      companySettings,
-                      tenantId,
-                    });
-                  } catch (e) {
-                    console.error(e);
-                    alert("Erro ao baixar PDF. Tente novamente.");
-                  } finally {
-                    setDownloadingPdf(false);
-                  }
-                }}
-                className="w-full rounded-2xl bg-gradient-to-r from-pink-500 via-rose-500 to-purple-600 py-3.5 text-sm font-bold text-white shadow-lg shadow-pink-200 hover:opacity-95 transition disabled:opacity-50"
-              >
-                {downloadingPdf ? "Gerando PDF..." : "📥 Baixar Minha Cópia do Contrato (PDF)"}
-              </button>
-
               {(companySettings?.whatsapp || companySettings?.phone) && (
                 <a
                   href={waLink(
@@ -362,7 +337,14 @@ export default function PublicSign({
                     Contratante
                   </span>
                   <h3 className="font-bold text-stone-800 text-base">{contract.clientName}</h3>
-                  {contract.cpf && <p className="text-xs text-stone-500">CPF: {contract.cpf}</p>}
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-stone-500 mt-1">
+                    {contract.cpf && <span>CPF: <b className="text-stone-700">{contract.cpf}</b></span>}
+                    {(contract.whatsapp || contract.clientPhone) && (
+                      <span className="inline-flex items-center gap-1 font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-100">
+                        📱 WhatsApp: {contract.whatsapp || contract.clientPhone}
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <span className="rounded-2xl bg-pink-100 text-pink-600 px-3 py-1 font-bold text-sm">
                   {brl(contract.value)}

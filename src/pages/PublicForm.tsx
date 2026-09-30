@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { db } from "../lib/firebase";
-import type { TenantData, Client, EventModel, PublicFormSubmission, Contract } from "../lib/types";
+import type { TenantData, Client, EventModel, PublicFormSubmission, Contract, CalendarEvent } from "../lib/types";
 import { uid, fmtDate } from "../lib/format";
 import { waLink } from "../lib/helpers";
 import { sanitizeContract } from "../lib/firestoreUtils";
@@ -226,12 +226,25 @@ export default function PublicForm({ tenantId }: { tenantId: string }) {
         user: "Cliente (Online)",
       };
 
+      // Agenda automática no calendário na data preenchida
+      const existingCalendarEvents = currentData.events || [];
+      const newCalendarEvent: CalendarEvent = {
+        id: uid(),
+        theme: theme.trim() || "Decoração Pegue e Monte",
+        clientName: name.trim(),
+        date: eventDate,
+        setupTime: eventTime || "09:00",
+        pickupTime: "09:00",
+        returnTime: "12:00",
+      };
+
       // Save everything to Firestore
       await setDoc(
         doc(db, "tenant_data", tenantId),
         {
           clients: newClients,
           eventsList: [newEvent, ...existingEvents],
+          events: [newCalendarEvent, ...existingCalendarEvents],
           contracts: [newContract, ...existingContracts],
           formSubmissions: [newSubmission, ...existingSubmissions],
           actionLogs: [newLog, ...existingLogs].slice(0, 100),
