@@ -26,8 +26,8 @@ export const normalizeWaPhone = (phone: string): string => {
 export const waLink = (phone: string, text?: string) => {
   const clean = normalizeWaPhone(phone);
   if (!clean) return "#";
-  const t = text ? `?text=${encodeURIComponent(text)}` : "";
-  return `https://wa.me/${clean}${t}`;
+  const t = text ? `&text=${encodeURIComponent(text)}` : "";
+  return `https://api.whatsapp.com/send?phone=${clean}${t}`;
 };
 
 export const igLink = (handle: string) =>

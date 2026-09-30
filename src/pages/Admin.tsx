@@ -3,7 +3,7 @@ import { collection, onSnapshot, doc, setDoc, deleteDoc } from "firebase/firesto
 import { db } from "../lib/firebase";
 import { useStore } from "../lib/store";
 import type { Tenant, TenantStatus, PlanType } from "../lib/types";
-import { waLink } from "../lib/helpers";
+import { waLink, copy } from "../lib/helpers";
 import { fmtDate, uid } from "../lib/format";
 import { Icon } from "../components/icons";
 
@@ -16,6 +16,9 @@ export default function Admin() {
   const [planType, setPlanType] = useState<PlanType>("monthly");
   const [customDays, setCustomDays] = useState(30);
   const [loading, setLoading] = useState(false);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [createdTenantModal, setCreatedTenantModal] = useState<Tenant | null>(null);
+  const [modalCopied, setModalCopied] = useState(false);
 
   useEffect(() => {
     const unsub = onSnapshot(collection(db, "tenants"), (snapshot) => {
@@ -62,11 +65,11 @@ export default function Admin() {
       };
 
       await setDoc(doc(db, "tenants", code), newTenant);
+      setCreatedTenantModal(newTenant);
       setNewCode("");
       setNewName("");
       setNewWhatsapp("");
       setPlanType("monthly");
-      alert(`Acesso criado com sucesso para ${newTenant.name}!`);
     } catch (e) {
       console.error(e);
       alert("Erro ao criar acesso.");
@@ -213,7 +216,7 @@ export default function Admin() {
         : "Acesso Liberado";
 
     const expiryText = t.expiresAt ? fmtDate(t.expiresAt) : "Conforme combinado";
-    const appUrl = `https://${window.location.host}/`;
+    const appUrl = typeof window !== "undefined" ? `${window.location.protocol}//${window.location.host}/` : "https://...";
 
     return (
       `Olá, ${t.name}! ✨\n\n` +
@@ -521,6 +524,24 @@ export default function Admin() {
                             </a>
                           )}
 
+                          {/* Copiar mensagem */}
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              await copy(generateWelcomeMessage(t));
+                              setCopiedId(t.id);
+                              setTimeout(() => setCopiedId(null), 2500);
+                            }}
+                            className="rounded-xl bg-stone-100 p-2 text-stone-700 shadow-sm hover:bg-stone-200 transition"
+                            title="Copiar texto de boas-vindas com chave e link"
+                          >
+                            {copiedId === t.id ? (
+                              <span className="text-xs font-bold text-emerald-600">✓</span>
+                            ) : (
+                              <Icon.copy className="h-4 w-4" />
+                            )}
+                          </button>
+
                           {/* Renovar +30 dias */}
                           <button
                             onClick={() => handleRenew(t, 30)}
@@ -576,6 +597,74 @@ export default function Admin() {
             </table>
           </div>
         </div>
+
+        {/* Modal de Confirmação de Cadastro e Envio de Acesso */}
+        {createdTenantModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-in fade-in">
+            <div className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl space-y-4 border border-stone-100">
+              <div className="flex items-center justify-between border-b border-stone-100 pb-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-2xl">🎉</span>
+                  <div>
+                    <h3 className="text-lg font-bold text-stone-800">Acesso Criado com Sucesso!</h3>
+                    <p className="text-xs text-stone-500">Decoradora: <b>{createdTenantModal.name}</b></p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => {
+                    setCreatedTenantModal(null);
+                    setModalCopied(false);
+                  }}
+                  className="rounded-xl p-1.5 text-stone-400 hover:bg-stone-100 hover:text-stone-600"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="rounded-2xl bg-stone-50 p-4 text-xs font-mono text-stone-700 whitespace-pre-wrap max-h-56 overflow-y-auto border border-stone-200 leading-relaxed">
+                {generateWelcomeMessage(createdTenantModal)}
+              </div>
+
+              <div className="flex flex-wrap items-center justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await copy(generateWelcomeMessage(createdTenantModal));
+                    setModalCopied(true);
+                    setTimeout(() => setModalCopied(false), 2500);
+                  }}
+                  className="flex items-center gap-2 rounded-2xl border border-stone-200 bg-white px-4 py-2.5 text-xs font-bold text-stone-700 shadow-sm hover:bg-stone-50 transition"
+                >
+                  <Icon.copy className="h-4 w-4" />
+                  {modalCopied ? "✓ Mensagem Copiada!" : "Copiar Texto da Mensagem"}
+                </button>
+
+                {createdTenantModal.whatsapp && (
+                  <a
+                    href={waLink(createdTenantModal.whatsapp, generateWelcomeMessage(createdTenantModal))}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-center gap-2 rounded-2xl bg-emerald-500 px-5 py-2.5 text-xs font-bold text-white shadow-lg shadow-emerald-200 hover:bg-emerald-600 transition"
+                  >
+                    <Icon.wa className="h-4 w-4" />
+                    Enviar pelo WhatsApp
+                  </a>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCreatedTenantModal(null);
+                    setModalCopied(false);
+                  }}
+                  className="rounded-2xl bg-stone-900 px-4 py-2.5 text-xs font-bold text-white hover:bg-stone-800 transition"
+                >
+                  Concluir
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
