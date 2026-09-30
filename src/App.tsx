@@ -66,7 +66,7 @@ function Shell() {
   // Route Handlers
   const pathname = window.location.pathname;
   const isRouteAdmin = pathname.startsWith("/admin");
-  const catalogMatch = pathname.match(/^\/catalog\/(.+)$/);
+  const catalogMatch = pathname.match(/^\/(?:catalog|catalogo)\/(.+)$/);
   const formMatch = pathname.match(/^\/formulario\/(.+)$/);
   const signMatch = pathname.match(/^\/assinar\/([^/]+)\/([^/]+)$/);
 

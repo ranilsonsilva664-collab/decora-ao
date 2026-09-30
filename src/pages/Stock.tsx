@@ -8,7 +8,9 @@ import { compressImage } from "../utils/image";
 import type { InventoryItem, Kit, KitItemComponent, ItemCondition, ItemStatus, PartyTheme, ThemeStatus } from "../lib/types";
 import { storage } from "../lib/firebase";
 import { ref, uploadString, getDownloadURL, deleteObject } from "firebase/storage";
-import { getItemAvailability, getItemReservations } from "../lib/availability";
+import { getItemAvailability, getItemReservations, getKitAvailabilityForDate } from "../lib/availability";
+import { generateCatalogPdf } from "../utils/catalogPdf";
+import { copy, waLink } from "../lib/helpers";
 
 const THEME_STATUSES: ThemeStatus[] = ["Disponível", "Reservado", "Em manutenção"];
 const themeStatusColor: Record<ThemeStatus, string> = {
@@ -62,9 +64,10 @@ const emptyKit = (): Kit => ({
   category: "Kits",
   description: "",
   rentalPrice: 0,
+  quantity: 1,
   photos: [],
   items: [],
-  showInCatalog: false,
+  showInCatalog: true,
   createdAt: new Date().toISOString(),
 });
 
@@ -83,6 +86,8 @@ export default function Stock({
     categories,
     setCategories,
     eventsList,
+    contracts,
+    companySettings,
     catalogEnabled,
     setCatalogEnabled,
     tenantId,
@@ -124,7 +129,10 @@ export default function Stock({
   const [openKit, setOpenKit] = useState(false);
   const [kit, setKit] = useState<Kit>(emptyKit());
   const [kitUploading, setKitUploading] = useState(false);
+  const [kitPhotoUrlInput, setKitPhotoUrlInput] = useState("");
   const kitFileInputRef = useRef<HTMLInputElement>(null);
+  const [kitFilterDate, setKitFilterDate] = useState("");
+  const [downloadingCatalogPdf, setDownloadingCatalogPdf] = useState(false);
 
   // Kit Component selector helper state
   const [selectedCompItemId, setSelectedCompItemId] = useState("");
@@ -368,16 +376,94 @@ export default function Stock({
   };
 
   // Kit functions
-  const saveKit = () => {
-    if (!kit.name.trim()) return toast("Informe o nome do Kit");
-    if (kit.items.length === 0) return toast("Adicione pelo menos uma peça ao Kit");
+  const handleKitPhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setKitUploading(true);
+    toast("Otimizando foto do kit...");
+    try {
+      const compressed = await compressImage(file, 800, 0.7);
+      if (compressed.startsWith("data:image")) {
+        try {
+          const fileName = `tenants/${tenantId || "default"}/kits/${kit.id || uid()}/${uid()}.jpg`;
+          const sRef = ref(storage, fileName);
+          const uploadPromise = uploadString(sRef, compressed, "data_url").then(() => getDownloadURL(sRef));
+          const timeoutPromise = new Promise<string>((_, reject) =>
+            setTimeout(() => reject(new Error("Storage timeout")), 5000)
+          );
+          const url = await Promise.race([uploadPromise, timeoutPromise]);
+          setKit((prev) => ({
+            ...prev,
+            photo: url,
+            photos: [url, ...(prev.photos || []).filter((p) => p !== url)],
+          }));
+          toast("Foto do kit carregada!");
+        } catch {
+          setKit((prev) => ({
+            ...prev,
+            photo: compressed,
+            photos: [compressed, ...(prev.photos || []).filter((p) => p !== compressed)],
+          }));
+          toast("Foto adicionada!");
+        }
+      }
+    } catch {
+      toast("Erro ao carregar imagem.");
+    } finally {
+      setKitUploading(false);
+    }
+  };
 
-    const exists = safeKits.some((k) => k.id === kit.id);
-    const updated = exists ? safeKits.map((k) => (k.id === kit.id ? kit : k)) : [kit, ...safeKits];
+  const handleDownloadKitPdf = async () => {
+    if (safeKits.length === 0) return toast("Cadastre pelo menos um kit para gerar o PDF.");
+    setDownloadingCatalogPdf(true);
+    toast("Gerando PDF do Catálogo de Kits...");
+    try {
+      const availMap: Record<string, any> = {};
+      if (kitFilterDate) {
+        safeKits.forEach((k) => {
+          availMap[k.id] = getKitAvailabilityForDate(k, kitFilterDate, contracts, eventsList, safeItems, safeKits);
+        });
+      }
+
+      await generateCatalogPdf({
+        kits: safeKits,
+        companySettings: companySettings || {},
+        selectedDate: kitFilterDate || undefined,
+        availabilityMap: kitFilterDate ? availMap : undefined,
+        onProgress: (status) => toast(status),
+      });
+      toast("Catálogo em PDF baixado com sucesso! 📄");
+    } catch (e) {
+      console.error(e);
+      toast("Erro ao gerar PDF do catálogo.");
+    } finally {
+      setDownloadingCatalogPdf(false);
+    }
+  };
+
+  const saveKit = () => {
+    if (!kit.name.trim()) return toast("Informe o nome do Kit de Decoração");
+    const sanitizedKit: Kit = {
+      ...kit,
+      name: kit.name.trim(),
+      category: kit.category || "Kits",
+      quantity: Math.max(1, Number(kit.quantity) || 1),
+      rentalPrice: Math.max(0, Number(kit.rentalPrice) || 0),
+      showInCatalog: kit.showInCatalog !== false,
+      items: kit.items || [],
+      photos: kit.photos && kit.photos.length > 0 ? kit.photos : kit.photo ? [kit.photo] : [],
+      photo: kit.photos && kit.photos.length > 0 ? kit.photos[0] : kit.photo || "",
+    };
+
+    const exists = safeKits.some((k) => k.id === sanitizedKit.id);
+    const updated = exists
+      ? safeKits.map((k) => (k.id === sanitizedKit.id ? sanitizedKit : k))
+      : [sanitizedKit, ...safeKits];
     setKits(updated);
     setOpenKit(false);
-    logAction(exists ? "Kit Atualizado" : "Novo Kit Criado", `${kit.name} (${kit.items.length} peças)`);
-    toast(exists ? "Kit atualizado!" : "Kit cadastrado!");
+    logAction(exists ? "Kit Atualizado" : "Novo Kit Criado", `${sanitizedKit.name}`);
+    toast(exists ? "Kit atualizado com sucesso! ✨" : "Kit de decoração cadastrado! 🎁");
   };
 
   const addComponentToKit = () => {
@@ -988,16 +1074,134 @@ export default function Stock({
       {/* TAB 3: KITS E COMPOSIÇÃO */}
       {activeTab === "kits" && (
         <div className="space-y-4">
+          {/* Top Bar: Consulta de Data, Baixar PDF e Compartilhar */}
+          <Card className="!p-4 bg-gradient-to-r from-pink-50/70 via-purple-50/50 to-white border-pink-100 shadow-sm">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-stone-700 flex items-center gap-1.5 uppercase tracking-wider">
+                    <span>📅</span> Checar Data:
+                  </span>
+                  <input
+                    type="date"
+                    value={kitFilterDate}
+                    onChange={(e) => setKitFilterDate(e.target.value)}
+                    className="rounded-xl border border-stone-200 bg-white px-3 py-1.5 text-xs font-semibold text-stone-700 shadow-sm focus:border-pink-400 focus:outline-none"
+                  />
+                  {kitFilterDate && (
+                    <button
+                      onClick={() => setKitFilterDate("")}
+                      className="rounded-lg bg-stone-200 px-2 py-1 text-[11px] font-bold text-stone-600 hover:bg-stone-300 transition"
+                      title="Limpar filtro de data"
+                    >
+                      ✕ Limpar
+                    </button>
+                  )}
+                </div>
+
+                {kitFilterDate && (
+                  <span className="text-xs font-bold text-pink-700 bg-pink-100 px-3 py-1 rounded-full shadow-sm">
+                    Disponibilidade para: {fmtDate(kitFilterDate)}
+                  </span>
+                )}
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                {/* Botão Baixar PDF do Catálogo de Kits */}
+                <Button
+                  variant="soft"
+                  disabled={downloadingCatalogPdf || safeKits.length === 0}
+                  onClick={handleDownloadKitPdf}
+                  className="!text-xs font-bold gap-1.5 shadow-sm"
+                >
+                  <span>📥</span> {downloadingCatalogPdf ? "Gerando PDF..." : "Baixar Catálogo em PDF"}
+                </Button>
+
+                {/* Compartilhar WhatsApp */}
+                <a
+                  href={waLink(
+                    "",
+                    `Olá! Confira nosso catálogo de kits e decorações completas Pegue e Monte:\n\n${catalogUrl}?tab=kits`
+                  )}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  <Button variant="wa" className="!text-xs font-bold gap-1.5 shadow-sm">
+                    <Icon.wa className="h-4 w-4" /> WhatsApp
+                  </Button>
+                </a>
+
+                {/* Copiar Link */}
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    copy(`${catalogUrl}?tab=kits`);
+                    toast("Link do catálogo de kits copiado!");
+                  }}
+                  className="!text-xs font-bold text-stone-600 border border-stone-200 shadow-sm"
+                >
+                  <Icon.copy className="h-3.5 w-3.5" /> Copiar Link
+                </Button>
+
+                <Button
+                  onClick={() => {
+                    setKit(emptyKit());
+                    setOpenKit(true);
+                  }}
+                  className="!text-xs font-bold gap-1 shadow-sm"
+                >
+                  <Icon.plus className="h-3.5 w-3.5" /> + Novo Kit
+                </Button>
+              </div>
+            </div>
+          </Card>
+
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {safeKits.map((k) => {
               const mainPhoto = k.photos && k.photos.length > 0 ? k.photos[0] : k.photo;
+              const avail = kitFilterDate
+                ? getKitAvailabilityForDate(k, kitFilterDate, contracts, eventsList, safeItems, safeKits)
+                : null;
+
               return (
                 <Card key={k.id} className="animate-rise flex flex-col justify-between">
                   <div>
                     <div className="flex items-center justify-between mb-2">
-                      <Badge color="lilac">{k.category || "Kit Festa"}</Badge>
-                      <span className="font-bold text-stone-800 text-sm">{brl(k.rentalPrice || 0)}</span>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <Badge color="lilac">{k.category || "Kit Festa"}</Badge>
+                        {k.showInCatalog !== false ? (
+                          <span className="text-[10px] font-bold text-purple-700 bg-purple-100 px-2 py-0.5 rounded-full">
+                            👁️ No Catálogo
+                          </span>
+                        ) : (
+                          <span className="text-[10px] font-bold text-stone-500 bg-stone-100 px-2 py-0.5 rounded-full">
+                            Oculto
+                          </span>
+                        )}
+                        <span className="text-[10px] font-bold text-stone-500 bg-stone-100 px-2 py-0.5 rounded-full">
+                          Estoque: {k.quantity || 1} un.
+                        </span>
+                      </div>
+                      <span className="font-extrabold text-stone-800 text-sm">{brl(k.rentalPrice || 0)}</span>
                     </div>
+
+                    {/* Status de Disponibilidade em tempo real para a data */}
+                    {avail && (
+                      <div
+                        className={`mb-2.5 rounded-xl px-2.5 py-1 text-xs font-bold flex items-center justify-between ${
+                          !avail.isAvailable
+                            ? "bg-rose-100 text-rose-700 border border-rose-200"
+                            : avail.statusColor === "amber"
+                            ? "bg-amber-100 text-amber-700 border border-amber-200"
+                            : "bg-emerald-100 text-emerald-700 border border-emerald-200"
+                        }`}
+                      >
+                        <span>{avail.isAvailable ? "🟢 " + avail.label : "🔴 " + avail.label}</span>
+                        {avail.totalQty > 1 && (
+                          <span className="text-[10px] opacity-80">Total: {avail.totalQty} un.</span>
+                        )}
+                      </div>
+                    )}
 
                     <div className="relative h-32 w-full rounded-2xl bg-stone-100 overflow-hidden mb-3">
                       {mainPhoto ? (
@@ -1133,63 +1337,138 @@ export default function Stock({
 
       {/* TAB 4: CATÁLOGO ONLINE */}
       {activeTab === "catalog" && (
-        <div className="space-y-4">
-          <Card className="bg-gradient-to-br from-lilac-50 to-nude-50 border-lilac-200">
+        <div className="space-y-5">
+          {/* Card Ativação do Catálogo */}
+          <Card className="bg-gradient-to-br from-pink-50/70 via-purple-50/50 to-white border-pink-200">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
-                <h3 className="font-semibold text-stone-800 text-lg flex items-center gap-2">
-                  <Icon.ig className="h-5 w-5 text-lilac-500" />
-                  Catálogo Online de Peças Avulsas
+                <h3 className="font-bold text-stone-800 text-lg flex items-center gap-2">
+                  <span>✨</span> Catálogo Online Interativo (Kits e Peças)
                 </h3>
-                <p className="text-sm text-stone-600 mt-1">
-                  Seus clientes podem visualizar todas as peças marcadas com "Mostrar no Catálogo" através deste link.
+                <p className="text-xs text-stone-600 mt-1">
+                  Seus clientes podem visualizar suas decorações completas, consultar disponibilidade por data e baixar o catálogo em PDF.
                 </p>
               </div>
-              <div className="flex flex-col gap-2">
-                <label className="flex items-center justify-end gap-2 cursor-pointer text-stone-700">
-                  <span className="font-medium text-sm">
-                    {catalogEnabled ? "Catálogo Ativo" : "Catálogo Desativado"}
-                  </span>
-                  <input
-                    type="checkbox"
-                    checked={!!catalogEnabled}
-                    onChange={(e) => setCatalogEnabled(e.target.checked)}
-                    className="h-4 w-4 rounded border-stone-300 text-lilac-500 focus:ring-lilac-400"
-                  />
-                </label>
-                {catalogEnabled && (
-                  <div className="flex gap-2">
-                    <Button
-                      variant="soft"
-                      className="!text-stone-600 !px-3 !py-1.5 text-xs"
-                      onClick={() => {
-                        navigator.clipboard.writeText(catalogUrl);
-                        toast("Link do catálogo copiado!");
-                      }}
-                    >
-                      Copiar Link
-                    </Button>
-                    <a
-                      href={`https://wa.me/?text=${encodeURIComponent(
-                        `Olá! Confira nosso catálogo de peças para locação Pegue e Monte:\n\n${catalogUrl}`
-                      )}`}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      <Button variant="wa" className="!px-3 !py-1.5 text-xs">
-                        <Icon.wa className="h-3 w-3" /> WhatsApp
-                      </Button>
-                    </a>
-                  </div>
-                )}
-              </div>
+              <label className="flex items-center gap-3 cursor-pointer rounded-2xl bg-white px-4 py-2.5 shadow-sm border border-stone-200">
+                <span className="font-bold text-xs text-stone-800">
+                  {catalogEnabled ? "🟢 Catálogo Ativo" : "⛔ Catálogo Desativado"}
+                </span>
+                <input
+                  type="checkbox"
+                  checked={!!catalogEnabled}
+                  onChange={(e) => setCatalogEnabled(e.target.checked)}
+                  className="h-5 w-5 rounded border-stone-300 text-pink-600 focus:ring-pink-400"
+                />
+              </label>
             </div>
           </Card>
 
-          <div className="text-sm text-stone-500">
-            Peças ativas no catálogo público:{" "}
-            <b>{safeItems.filter((it) => it.showInCatalog).length} peças</b>
-          </div>
+          {/* Seção 1: Catálogo de Kits de Decoração Completa */}
+          <Card className="border-pink-100 space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-stone-100 pb-3">
+              <div className="flex items-center gap-2.5">
+                <span className="grid h-10 w-10 place-items-center rounded-2xl bg-gradient-to-br from-pink-500 to-purple-600 text-xl text-white shadow-md shadow-pink-200">
+                  🎁
+                </span>
+                <div>
+                  <h4 className="font-bold text-stone-800 text-base">Catálogo de Kits de Decoração Completa</h4>
+                  <p className="text-xs text-stone-500">
+                    {safeKits.filter((k) => k.showInCatalog !== false).length} kits ativos para visualização do cliente
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  variant="soft"
+                  disabled={downloadingCatalogPdf || safeKits.length === 0}
+                  onClick={handleDownloadKitPdf}
+                  className="!text-xs font-bold gap-1.5"
+                >
+                  <span>📥</span> {downloadingCatalogPdf ? "Gerando..." : "Baixar PDF"}
+                </Button>
+
+                <a
+                  href={waLink(
+                    "",
+                    `Olá! Confira nosso catálogo de kits e decorações completas Pegue e Monte:\n\n${catalogUrl}?tab=kits`
+                  )}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  <Button variant="wa" className="!text-xs font-bold gap-1.5">
+                    <Icon.wa className="h-3.5 w-3.5" /> WhatsApp
+                  </Button>
+                </a>
+
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    copy(`${catalogUrl}?tab=kits`);
+                    toast("Link dos Kits copiado!");
+                  }}
+                  className="!text-xs font-bold text-stone-700 border border-stone-200"
+                >
+                  <Icon.copy className="h-3.5 w-3.5" /> Copiar Link
+                </Button>
+
+                <a href={`${catalogUrl}?tab=kits`} target="_blank" rel="noreferrer">
+                  <Button className="!text-xs font-bold">Ver Catálogo ↗</Button>
+                </a>
+              </div>
+            </div>
+
+            <p className="text-xs text-stone-500">
+              💡 <b>Dica:</b> No catálogo de kits, o cliente pode selecionar a data do evento para checar se a decoração já está reservada ou disponível, e clicar para reservar diretamente no seu WhatsApp!
+            </p>
+          </Card>
+
+          {/* Seção 2: Catálogo de Peças Avulsas */}
+          <Card className="border-stone-200 space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-stone-100 pb-3">
+              <div className="flex items-center gap-2.5">
+                <span className="grid h-10 w-10 place-items-center rounded-2xl bg-stone-100 text-xl text-stone-700 border border-stone-200">
+                  📦
+                </span>
+                <div>
+                  <h4 className="font-bold text-stone-800 text-base">Catálogo de Peças Avulsas</h4>
+                  <p className="text-xs text-stone-500">
+                    {safeItems.filter((it) => it.showInCatalog).length} peças marcadas com "Mostrar no Catálogo"
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <a
+                  href={waLink(
+                    "",
+                    `Olá! Confira nosso catálogo de peças avulsas para locação:\n\n${catalogUrl}?tab=items`
+                  )}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  <Button variant="wa" className="!text-xs font-bold gap-1.5">
+                    <Icon.wa className="h-3.5 w-3.5" /> WhatsApp
+                  </Button>
+                </a>
+
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    copy(`${catalogUrl}?tab=items`);
+                    toast("Link das Peças copiado!");
+                  }}
+                  className="!text-xs font-bold text-stone-700 border border-stone-200"
+                >
+                  <Icon.copy className="h-3.5 w-3.5" /> Copiar Link
+                </Button>
+
+                <a href={`${catalogUrl}?tab=items`} target="_blank" rel="noreferrer">
+                  <Button variant="soft" className="!text-xs font-bold">Ver Peças ↗</Button>
+                </a>
+              </div>
+            </div>
+          </Card>
         </div>
       )}
 
@@ -1510,41 +1789,158 @@ export default function Stock({
       <Modal
         open={openKit}
         onClose={() => setOpenKit(false)}
-        title={safeKits.some((x) => x.id === kit.id) ? "Editar Kit" : "Criar Novo Kit"}
+        title={safeKits.some((x) => x.id === kit.id) ? "Editar Kit de Decoração" : "Criar Novo Kit de Decoração"}
         wide
       >
         <div className="space-y-4 mt-2">
+          {/* Foto do Kit */}
+          <div className="rounded-2xl bg-stone-50 p-4 border border-stone-200 space-y-3">
+            <h4 className="text-xs font-bold text-stone-700 uppercase tracking-wider flex items-center gap-1.5">
+              <span>🖼️</span> Imagem Principal do Kit (Aparecerá no Catálogo e no PDF)
+            </h4>
+
+            <div className="flex flex-col sm:flex-row items-center gap-4">
+              <div className="relative h-28 w-28 shrink-0 rounded-2xl bg-white border border-stone-200 overflow-hidden shadow-sm flex items-center justify-center">
+                {kit.photos && kit.photos.length > 0 ? (
+                  <img src={kit.photos[0]} alt="Kit" className="h-full w-full object-cover" />
+                ) : kit.photo ? (
+                  <img src={kit.photo} alt="Kit" className="h-full w-full object-cover" />
+                ) : (
+                  <span className="text-3xl text-stone-300">🎁</span>
+                )}
+              </div>
+
+              <div className="flex-1 space-y-2 w-full">
+                <input
+                  type="file"
+                  ref={kitFileInputRef}
+                  accept="image/*"
+                  onChange={handleKitPhotoUpload}
+                  className="hidden"
+                />
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    variant="soft"
+                    onClick={() => kitFileInputRef.current?.click()}
+                    disabled={kitUploading}
+                    className="!text-xs font-bold"
+                  >
+                    <span>📷</span> {kitUploading ? "Enviando..." : "Carregar Foto do Computador / Celular"}
+                  </Button>
+                  {(kit.photo || (kit.photos && kit.photos.length > 0)) && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      onClick={() => setKit({ ...kit, photo: "", photos: [] })}
+                      className="!text-xs text-rose-500 hover:text-rose-700"
+                    >
+                      Remover Foto
+                    </Button>
+                  )}
+                </div>
+
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="Ou cole a URL direta de uma imagem..."
+                    value={kitPhotoUrlInput}
+                    onChange={(e) => setKitPhotoUrlInput(e.target.value)}
+                    className="!bg-white text-xs"
+                  />
+                  <Button
+                    type="button"
+                    variant="soft"
+                    onClick={() => {
+                      if (kitPhotoUrlInput.trim()) {
+                        setKit((prev) => ({
+                          ...prev,
+                          photo: kitPhotoUrlInput.trim(),
+                          photos: [kitPhotoUrlInput.trim(), ...(prev.photos || []).filter((p) => p !== kitPhotoUrlInput.trim())],
+                        }));
+                        setKitPhotoUrlInput("");
+                        toast("Foto adicionada via URL!");
+                      }
+                    }}
+                    className="!py-1.5 text-xs font-semibold"
+                  >
+                    Aplicar
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-3">
+            <div className="sm:col-span-2">
+              <Field label="Nome da Decoração / Kit (Ex: Kit Safari Completo)">
+                <Input
+                  value={kit.name}
+                  onChange={(e) => setKit({ ...kit, name: e.target.value })}
+                  placeholder="Nome do Kit de Decoração"
+                />
+              </Field>
+            </div>
+            <div>
+              <Field label="Valor de Locação (R$)">
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={kit.rentalPrice || ""}
+                  onChange={(e) => setKit({ ...kit, rentalPrice: +e.target.value })}
+                  placeholder="0.00"
+                />
+              </Field>
+            </div>
+          </div>
+
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Nome do Kit (Ex: Kit Romano Rosa Completo)">
+            <Field label="Categoria da Decoração">
               <Input
-                value={kit.name}
-                onChange={(e) => setKit({ ...kit, name: e.target.value })}
-                placeholder="Nome do Kit"
+                value={kit.category || ""}
+                onChange={(e) => setKit({ ...kit, category: e.target.value })}
+                placeholder="Ex: Infantil, Casamento, Chá de Bebê, Geral..."
               />
             </Field>
-            <Field label="Valor de Locação do Kit (R$)">
+
+            <Field label="Quantidade Total Disponível no Acervo">
               <Input
                 type="number"
-                step="0.01"
-                value={kit.rentalPrice || ""}
-                onChange={(e) => setKit({ ...kit, rentalPrice: +e.target.value })}
-                placeholder="0.00"
+                min="1"
+                value={kit.quantity || 1}
+                onChange={(e) => setKit({ ...kit, quantity: Math.max(1, Number(e.target.value) || 1) })}
+                placeholder="1"
               />
             </Field>
           </div>
 
-          <Field label="Descrição do Kit">
+          <Field label="Descrição da Decoração">
             <Textarea
               value={kit.description || ""}
               onChange={(e) => setKit({ ...kit, description: e.target.value })}
-              placeholder="Indicação de tamanho de espaço, estilo e composição..."
+              placeholder="Indicação de tamanho de espaço, painel, cilindros e estilo da decoração..."
             />
           </Field>
 
+          {/* Exibir no Catálogo Checkbox */}
+          <div className="rounded-2xl bg-purple-50/60 p-3.5 border border-purple-100 flex items-center justify-between">
+            <div>
+              <p className="text-xs font-bold text-stone-800">Mostrar no Catálogo Público de Decoração</p>
+              <p className="text-[11px] text-stone-500">Se marcado, o cliente poderá ver e reservar este kit pelo link do catálogo e no PDF.</p>
+            </div>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={kit.showInCatalog !== false}
+                onChange={(e) => setKit({ ...kit, showInCatalog: e.target.checked })}
+                className="h-5 w-5 rounded border-stone-300 text-purple-600 focus:ring-purple-400"
+              />
+            </label>
+          </div>
+
           {/* Component items in Kit */}
-          <div className="rounded-2xl bg-white/70 p-4 border border-white/80 space-y-3">
+          <div className="rounded-2xl bg-white/70 p-4 border border-stone-200 space-y-3">
             <h4 className="text-xs font-bold text-stone-700 uppercase tracking-wider">
-              Peças que compõem este Kit:
+              Peças que compõem este Kit (Opcional - para controle de estoque individual):
             </h4>
 
             <div className="flex flex-col sm:flex-row gap-2">
@@ -1604,7 +2000,7 @@ export default function Stock({
               ))}
               {kit.items.length === 0 && (
                 <p className="p-4 text-center text-xs text-stone-400">
-                  Nenhuma peça adicionada ainda a este kit.
+                  Nenhuma peça individual vinculada ainda. O kit pode ser alugado como pacote completo.
                 </p>
               )}
             </div>

@@ -80,6 +80,7 @@ export interface Kit {
   category: string;
   description?: string;
   rentalPrice: number;
+  quantity?: number;
   photo?: string;
   photos?: string[];
   items: KitItemComponent[];

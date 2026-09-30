@@ -228,3 +228,156 @@ export function getItemReservations(
 
   return result.sort((a, b) => a.pickupDate.localeCompare(b.pickupDate));
 }
+
+export interface KitDateAvailability {
+  kitId: string;
+  kitName: string;
+  isAvailable: boolean;
+  totalQty: number;
+  rentedQty: number;
+  remainingQty: number;
+  label: string;
+  statusColor: "green" | "red" | "amber";
+  reason?: string;
+}
+
+/**
+ * Calcula a disponibilidade exata de um Kit / Tema de Decoração Completa para uma data específica.
+ * Reconhece se o tema/kit está locado em Contratos ativos, Eventos na Agenda ou se peças do kit estão esgotadas.
+ */
+export function getKitAvailabilityForDate(
+  kit: Kit,
+  targetDate: string,
+  contracts: any[] = [],
+  eventsList: EventModel[] = [],
+  inventoryItems: InventoryItem[] = [],
+  allKits: Kit[] = []
+): KitDateAvailability {
+  const totalQty = Math.max(1, kit.quantity || 1);
+  const cleanTarget = normalizeDate(targetDate);
+
+  if (!cleanTarget) {
+    return {
+      kitId: kit.id,
+      kitName: kit.name,
+      isAvailable: true,
+      totalQty,
+      rentedQty: 0,
+      remainingQty: totalQty,
+      label: totalQty === 1 ? "Disponível" : `${totalQty} un. disponíveis`,
+      statusColor: "green",
+    };
+  }
+
+  const kitNameLower = (kit.name || "").trim().toLowerCase();
+  let rentedContractsCount = 0;
+  const rentingClients: string[] = [];
+
+  // 1. Contratos ativos na data
+  for (const c of contracts) {
+    if (c.status === "Cancelado") continue;
+    const cStart = normalizeDate(c.pickupDate || c.partyDate);
+    const cEnd = normalizeDate(c.returnDate || c.partyDate);
+
+    if (datesOverlap(cleanTarget, cleanTarget, cStart, cEnd)) {
+      const cTheme = (c.theme || "").trim().toLowerCase();
+      // Match by exact or substring theme name
+      const matchesTheme = cTheme && (cTheme === kitNameLower || kitNameLower.includes(cTheme) || cTheme.includes(kitNameLower));
+      
+      // Also match if contract has items mentioning this kit
+      const matchesItem = Array.isArray(c.items) && c.items.some((it: any) => 
+        (it.id === kit.id) || ((it.name || "").trim().toLowerCase() === kitNameLower)
+      );
+
+      if (matchesTheme || matchesItem) {
+        rentedContractsCount += 1;
+        if (c.clientName) rentingClients.push(c.clientName);
+      }
+    }
+  }
+
+  // 2. Eventos da agenda ativos na data
+  let rentedEventsCount = 0;
+  for (const ev of eventsList) {
+    if (ev.status === "Cancelado" || ev.status === "Finalizado") continue;
+    const evStart = normalizeDate(ev.pickupDate || ev.date);
+    const evEnd = normalizeDate(ev.returnDate || ev.date);
+
+    if (datesOverlap(cleanTarget, cleanTarget, evStart, evEnd)) {
+      const evTheme = (ev.theme || "").trim().toLowerCase();
+      const matchesTheme = evTheme && (evTheme === kitNameLower || kitNameLower.includes(evTheme) || evTheme.includes(kitNameLower));
+      const matchesKitInItems = (ev.items || []).some(
+        (it) => it.type === "kit" && (it.id === kit.id || it.name.trim().toLowerCase() === kitNameLower)
+      );
+
+      if (matchesTheme || matchesKitInItems) {
+        // Evita duplicar se for o mesmo evento/contrato
+        const alreadyCountedInContracts = rentingClients.some(
+          (cl) => cl.toLowerCase() === (ev.clientName || "").toLowerCase()
+        );
+        if (!alreadyCountedInContracts) {
+          rentedEventsCount += 1;
+        }
+      }
+    }
+  }
+
+  let totalRented = rentedContractsCount + rentedEventsCount;
+
+  // 3. Checagem de peças individuais do kit (se o kit for composto por peças do acervo)
+  if (kit.items && kit.items.length > 0 && inventoryItems.length > 0) {
+    const kitAvail = checkKitAvailability(
+      kit.id,
+      1,
+      cleanTarget,
+      cleanTarget,
+      inventoryItems,
+      allKits.length > 0 ? allKits : [kit],
+      eventsList
+    );
+
+    if (!kitAvail.ok && totalRented === 0) {
+      // Peças faltantes no acervo para essa data
+      const missingDetails = kitAvail.shortages.map((s) => s.itemName).join(", ");
+      return {
+        kitId: kit.id,
+        kitName: kit.name,
+        isAvailable: false,
+        totalQty,
+        rentedQty: totalQty,
+        remainingQty: 0,
+        label: "Indisponível nesta data",
+        statusColor: "red",
+        reason: `Peças em uso nesta data: ${missingDetails}`,
+      };
+    }
+  }
+
+  const remainingQty = Math.max(0, totalQty - totalRented);
+  const isAvailable = remainingQty > 0;
+
+  let label = "Disponível";
+  let statusColor: "green" | "red" | "amber" = "green";
+
+  if (!isAvailable) {
+    label = "Indisponível nesta data";
+    statusColor = "red";
+  } else if (totalRented > 0 && remainingQty > 0) {
+    label = `${remainingQty} de ${totalQty} disponíveis`;
+    statusColor = "amber";
+  } else {
+    label = totalQty === 1 ? "Disponível para esta data" : `${totalQty} un. disponíveis`;
+    statusColor = "green";
+  }
+
+  return {
+    kitId: kit.id,
+    kitName: kit.name,
+    isAvailable,
+    totalQty,
+    rentedQty: totalRented,
+    remainingQty,
+    label,
+    statusColor,
+  };
+}
