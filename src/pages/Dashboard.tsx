@@ -145,7 +145,7 @@ export default function Dashboard({ go }: { go: (p: Page) => void }) {
       <div className="animate-fade flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <p className="text-xs font-semibold text-lilac-500 uppercase tracking-wider">
-            {companySettings.tradeName || "RAYDECOR"} • Pegue e Monte ✨
+            {companySettings.tradeName || companySettings.name || "Minha Empresa"} • Pegue e Monte ✨
           </p>
           <h1 className="text-2xl font-bold tracking-tight text-stone-800 sm:text-3xl">
             Painel Operacional & Financeiro
@@ -395,7 +395,7 @@ export default function Dashboard({ go }: { go: (p: Page) => void }) {
             .filter((t) => t.type === "entrada" && t.status === "Pago")
             .reduce((s, t) => s + t.amount, 0)
         )}{" "}
-        • {companySettings.tradeName || "RAYDECOR"} Pegue e Monte 💕
+        • {companySettings.tradeName || companySettings.name || "Gestão"} Pegue e Monte 💕
       </p>
     </div>
   );

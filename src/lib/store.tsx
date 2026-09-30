@@ -55,8 +55,8 @@ export const DEFAULT_CATEGORIES: string[] = [
 ];
 
 const DEFAULT_COMPANY_SETTINGS: CompanySettings = {
-  name: "RAYDECOR Pegue e Monte",
-  tradeName: "RAYDECOR",
+  name: "Minha Empresa Pegue e Monte",
+  tradeName: "Minha Empresa",
   cnpjCpf: "",
   phone: "",
   whatsapp: "",
@@ -343,8 +343,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
                   ...contract,
                   tenantId,
                   companySettings: {
-                    name: data.companySettings?.name || "RAYDECOR Pegue e Monte",
-                    tradeName: data.companySettings?.tradeName || "RAYDECOR",
+                    name: data.companySettings?.name || currentTenant?.name || "Minha Empresa Pegue e Monte",
+                    tradeName: data.companySettings?.tradeName || currentTenant?.name || "Minha Empresa",
                     logo: data.companySettings?.logo || "",
                     phone: data.companySettings?.phone || data.companySettings?.whatsapp || "",
                     terms: contract.customTerms || data.companySettings?.terms || data.contractRules || "",

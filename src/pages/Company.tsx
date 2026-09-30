@@ -92,7 +92,7 @@ export default function Company() {
     <div className="space-y-6 max-w-4xl">
       <SectionTitle
         title="Minha Empresa & Identidade Visual"
-        subtitle="Configure os dados da RAYDECOR utilizados nos contratos, orçamentos e recibos em PDF"
+        subtitle="Configure os dados da sua empresa utilizados nos contratos, orçamentos e recibos em PDF"
         action={
           <Button onClick={handleSave} disabled={saving}>
             {saving ? "Salvando..." : "Salvar Alterações"}
@@ -166,7 +166,7 @@ export default function Company() {
             <Input
               value={settings.name}
               onChange={(e) => setSettings({ ...settings, name: e.target.value })}
-              placeholder="Ex: RAYDECOR Locações e Decorações"
+              placeholder="Ex: Sua Empresa Locações e Festas"
             />
           </Field>
 
@@ -174,7 +174,7 @@ export default function Company() {
             <Input
               value={settings.tradeName}
               onChange={(e) => setSettings({ ...settings, tradeName: e.target.value })}
-              placeholder="Ex: RAYDECOR"
+              placeholder="Ex: Nome da sua Loja"
             />
           </Field>
         </div>
@@ -200,7 +200,7 @@ export default function Company() {
             <Input
               value={settings.email || ""}
               onChange={(e) => setSettings({ ...settings, email: e.target.value })}
-              placeholder="contato@raydecor.com.br"
+              placeholder="contato@suaempresa.com.br"
             />
           </Field>
         </div>

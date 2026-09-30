@@ -11,7 +11,7 @@ export default function PublicForm({ tenantId }: { tenantId: string }) {
   const [saving, setSaving] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [createdContractId, setCreatedContractId] = useState<string | null>(null);
-  const [companyName, setCompanyName] = useState("RAYDECOR Pegue e Monte");
+  const [companyName, setCompanyName] = useState("Pegue e Monte");
   const [companyPhone, setCompanyPhone] = useState("");
   const [companyWhatsapp, setCompanyWhatsapp] = useState("");
   const [companyLogo, setCompanyLogo] = useState(
@@ -50,7 +50,7 @@ export default function PublicForm({ tenantId }: { tenantId: string }) {
           const tData = snap.data() as Partial<TenantData>;
           if (tData.companySettings) {
             if (tData.companySettings.tradeName || tData.companySettings.name) {
-              setCompanyName(tData.companySettings.tradeName || tData.companySettings.name || "RAYDECOR Pegue e Monte");
+              setCompanyName(tData.companySettings.tradeName || tData.companySettings.name || "Pegue e Monte");
             }
             if (tData.companySettings.logo) setCompanyLogo(tData.companySettings.logo);
             if (tData.companySettings.whatsapp) setCompanyWhatsapp(tData.companySettings.whatsapp);

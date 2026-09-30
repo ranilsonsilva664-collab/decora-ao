@@ -61,7 +61,7 @@ const MORE_NAV: { id: Page; label: string; emoji: string }[] = [
 function Shell() {
   const [page, setPage] = useState<Page>("dashboard");
   const [showMoreModal, setShowMoreModal] = useState(false);
-  const { tenantId, isAdmin, isLoading, logout, companySettings } = useStore();
+  const { tenantId, isAdmin, isLoading, logout, companySettings, currentTenant } = useStore();
 
   // Route Handlers
   const pathname = window.location.pathname;
@@ -87,7 +87,7 @@ function Shell() {
       <div className="flex min-h-screen items-center justify-center font-medium text-stone-500 bg-[#fdf8fa]">
         <div className="flex flex-col items-center gap-3">
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-pink-200 border-t-pink-500" />
-          <p className="text-sm font-semibold text-stone-600">Carregando RAYDECOR...</p>
+          <p className="text-sm font-semibold text-stone-600">Carregando EventFlow CRM...</p>
         </div>
       </div>
     );
@@ -155,7 +155,7 @@ function Shell() {
           </div>
           <div className="min-w-0">
             <p className="font-bold leading-tight text-stone-800 truncate">
-              {companySettings?.tradeName || "RAYDECOR"}
+              {companySettings?.tradeName || currentTenant?.name || "Minha Empresa"}
             </p>
             <div className="flex items-center gap-1.5 text-[11px] text-stone-500">
               <span className="truncate">Conta: <b className="text-stone-700">{tenantId}</b></span>
@@ -241,7 +241,7 @@ function Shell() {
             </div>
             <div>
               <p className="font-bold text-stone-800 text-sm leading-none">
-                {companySettings?.tradeName || "RAYDECOR"}
+                {companySettings?.tradeName || currentTenant?.name || "Minha Empresa"}
               </p>
               <p className="text-[10px] text-stone-400">Pegue e Monte</p>
             </div>
@@ -334,7 +334,7 @@ function Shell() {
           >
             <div className="flex items-center justify-between pb-3 border-b border-stone-100 mb-4">
               <div>
-                <h3 className="font-bold text-stone-800 text-base">Mais Módulos RAYDECOR</h3>
+                <h3 className="font-bold text-stone-800 text-base">Mais Recursos do Sistema</h3>
                 <p className="text-[11px] text-stone-400">Acesse qualquer funcionalidade do sistema</p>
               </div>
               <button

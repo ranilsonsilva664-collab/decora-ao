@@ -220,7 +220,7 @@ export default function Admin() {
 
     return (
       `Olá, ${t.name}! ✨\n\n` +
-      `Seu acesso ao *CRM Pegue e Monte — RAYDECOR* está pronto e liberado!\n\n` +
+      `Seu acesso ao *EventFlow — CRM Pegue e Monte* está pronto e liberado!\n\n` +
       `📦 *Seu Plano:* ${planText}\n` +
       `📅 *Válido até:* ${expiryText}\n` +
       `🌐 *Link de Acesso:* ${appUrl}\n` +

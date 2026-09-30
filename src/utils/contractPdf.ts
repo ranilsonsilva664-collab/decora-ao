@@ -56,7 +56,7 @@ function generateNativeJsPdf(
   fileName: string
 ) {
   const doc = new jsPDF("p", "mm", "a4");
-  const compName = companySettings.tradeName || companySettings.name || "RAYDECOR Pegue e Monte";
+  const compName = companySettings.tradeName || companySettings.name || "Pegue e Monte";
   let y = 20;
 
   // Header
@@ -195,7 +195,7 @@ export async function downloadContractPdf({
 }: GeneratePdfOptions): Promise<void> {
   if (onProgress) onProgress("Preparando documento do contrato...");
 
-  const compName = companySettings.tradeName || companySettings.name || "RAYDECOR Pegue e Monte";
+  const compName = companySettings.tradeName || companySettings.name || "Pegue e Monte";
   const cleanClientName = (contract.clientName || "Cliente").replace(/[^a-zA-Z0-9áéíóúÁÉÍÓÚãõÃÕâêîôûÂÊÎÔÛçÇ]/g, "_");
   const fileName = `Contrato_${cleanClientName}.pdf`;
 

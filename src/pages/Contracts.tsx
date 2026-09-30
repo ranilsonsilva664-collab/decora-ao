@@ -70,7 +70,7 @@ export default function Contracts() {
     const signUrl = getSignLink(item.id);
     const clientPhone = item.whatsapp || item.clientPhone || "";
     return (
-      `📑 *CONTRATO DE LOCAÇÃO — ${companySettings.tradeName || "RAYDECOR"}*\n\n` +
+      `📑 *CONTRATO DE LOCAÇÃO — ${companySettings.tradeName || companySettings.name || "Pegue e Monte"}*\n\n` +
       `👤 *Contratante:* ${item.clientName} (CPF ${item.cpf || "—"})\n` +
       (clientPhone ? `📱 *WhatsApp:* ${clientPhone}\n` : "") +
       `🎉 *Tema:* ${item.theme} • Festa em ${fmtDate(item.partyDate)}\n` +
@@ -226,7 +226,7 @@ export default function Contracts() {
     setShareContract(item);
     setShareMessage(
       `Olá, ${item.clientName}! 💕\n` +
-      `Aqui é da equipe da ${companySettings.tradeName || "RAYDECOR Pegue e Monte"}.\n\n` +
+      `Aqui é da equipe da ${companySettings.tradeName || companySettings.name || "nossa empresa"}.\n\n` +
       `Já preparamos o seu *Contrato de Locação* para o evento no dia *${fmtDate(item.partyDate)}* (Tema: ${item.theme})! 🎉\n\n` +
       `💰 *Valor Total:* ${brl(item.value)}\n` +
       `💳 *Sinal (Reserva):* ${brl(item.deposit)}\n` +

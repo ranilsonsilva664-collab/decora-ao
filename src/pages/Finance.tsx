@@ -104,7 +104,7 @@ export default function Finance() {
     if (!w) return;
 
     const logo = companySettings.logo || "";
-    const compName = companySettings.name || "RAYDECOR Pegue e Monte";
+    const compName = companySettings.tradeName || companySettings.name || "Pegue e Monte";
     const clientData = clients.find((c) => c.name.toLowerCase() === (t.client || "").toLowerCase());
 
     w.document.write(`

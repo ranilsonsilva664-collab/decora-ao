@@ -242,7 +242,7 @@ export default function FormSubmissions() {
                       href={waLink(
                         sub.whatsapp,
                         `Olá, ${sub.clientName}! 💕\n` +
-                        `Aqui é da equipe da ${companySettings.tradeName || "RAYDECOR Pegue e Monte"}.\n\n` +
+                        `Aqui é da equipe da ${companySettings.tradeName || companySettings.name || "nossa empresa"}.\n\n` +
                         `Já preparamos o seu *Contrato de Locação* através dos dados do formulário para a festa no dia *${fmtDate(sub.eventDate)}* (Tema: ${sub.theme})! 🎉\n\n` +
                         (contract.value > 0 ? `💰 *Valor Total:* ${brl(contract.value)}\n` : "") +
                         (contract.deposit > 0 ? `💳 *Sinal (Reserva):* ${brl(contract.deposit)}\n\n` : "\n") +
@@ -460,7 +460,7 @@ export default function FormSubmissions() {
                 href={waLink(
                   editingContract.whatsapp || "",
                   `Olá, ${editingContract.clientName}! 💕\n` +
-                  `Aqui é da equipe da ${companySettings.tradeName || "RAYDECOR Pegue e Monte"}.\n\n` +
+                  `Aqui é da equipe da ${companySettings.tradeName || companySettings.name || "nossa empresa"}.\n\n` +
                   `Já atualizamos o seu *Contrato de Locação* para o evento no dia *${fmtDate(editingContract.partyDate)}* (Tema: ${editingContract.theme})! 🎉\n\n` +
                   (editingContract.value > 0 ? `💰 *Valor Total:* ${brl(editingContract.value)}\n` : "") +
                   (editingContract.deposit > 0 ? `💳 *Sinal (Reserva):* ${brl(editingContract.deposit)}\n\n` : "\n") +

@@ -15,7 +15,7 @@ export default function PublicSign({
 }) {
   const [contract, setContract] = useState<Contract | null>(null);
   const [companySettings, setCompanySettings] = useState<Partial<CompanySettings>>({});
-  const [companyName, setCompanyName] = useState("RAYDECOR Pegue e Monte");
+  const [companyName, setCompanyName] = useState("Pegue e Monte");
   const [companyLogo, setCompanyLogo] = useState(
     "https://res.cloudinary.com/dmxeqe939/image/upload/v1785097595/ChatGPT_Image_26_de_jul._de_2026_17_25_48_ilxojd.png"
   );
@@ -83,7 +83,7 @@ export default function PublicSign({
         if (loadedCompanySettings) {
           setCompanySettings(loadedCompanySettings);
           if (loadedCompanySettings.tradeName || loadedCompanySettings.name) {
-            setCompanyName(loadedCompanySettings.tradeName || loadedCompanySettings.name || "RAYDECOR Pegue e Monte");
+            setCompanyName(loadedCompanySettings.tradeName || loadedCompanySettings.name || "Pegue e Monte");
           }
           if (loadedCompanySettings.logo) {
             setCompanyLogo(loadedCompanySettings.logo);

@@ -112,7 +112,7 @@ export default function Quotes() {
   }, [quotes, filter, search]);
 
   const quoteMessage = (item: Quote) =>
-    `🎀 *ORÇAMENTO — ${companySettings.tradeName || "RAYDECOR"}*\n\n` +
+    `🎀 *ORÇAMENTO — ${companySettings.tradeName || companySettings.name || "Pegue e Monte"}*\n\n` +
     `👤 *Cliente:* ${item.clientName || "—"}\n` +
     `🎉 *Tema:* ${item.theme || "—"}\n` +
     `🗓️ *Data da Festa:* ${fmtDate(item.date)} às ${item.time || "—"}\n` +
@@ -297,7 +297,7 @@ export default function Quotes() {
     if (!w) return;
 
     const logo = companySettings.logo || "";
-    const compName = companySettings.name || "RAYDECOR Pegue e Monte";
+    const compName = companySettings.tradeName || companySettings.name || "Pegue e Monte";
     const subtotalVal = calcSubtotal(item);
     const totalVal = calcTotal(item);
     const depositVal = item.deposit || 0;
