@@ -139,7 +139,7 @@ function Shell() {
   };
 
   return (
-    <div className="flex min-h-screen">
+    <div className="flex min-h-screen w-full overflow-x-hidden">
       {/* Desktop sidebar */}
       <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col gap-1 border-r border-white/60 bg-white/50 p-5 backdrop-blur-xl lg:flex overflow-y-auto">
         <div className="mb-5 flex items-center gap-3 px-2">
@@ -225,7 +225,7 @@ function Shell() {
       </aside>
 
       {/* Main Content Area */}
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="flex min-w-0 flex-1 flex-col w-full overflow-x-hidden">
         {/* Mobile Header */}
         <header className="sticky top-0 z-30 flex items-center justify-between border-b border-white/60 bg-white/70 px-4 py-3 backdrop-blur-xl lg:hidden">
           <div className="flex items-center gap-2">
@@ -267,7 +267,7 @@ function Shell() {
         </header>
 
         {/* Page Content */}
-        <main className="mx-auto w-full max-w-7xl flex-1 p-4 pb-28 sm:p-6 lg:pb-8">
+        <main className="mx-auto w-full max-w-7xl flex-1 p-4 pb-24 sm:p-6 lg:pb-8">
           {renderPage()}
         </main>
       </div>

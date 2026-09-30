@@ -9,9 +9,9 @@ export function BarChart({
 }) {
   const max = Math.max(...data.map((d) => d.value), 1);
   return (
-    <div className="flex h-44 items-end justify-between gap-2">
+    <div className="flex h-44 w-full items-end justify-between gap-2 overflow-hidden">
       {data.map((d, i) => (
-        <div key={i} className="flex flex-1 flex-col items-center gap-2">
+        <div key={i} className="flex flex-1 flex-col items-center gap-2 min-w-0">
           <div className="flex w-full flex-1 items-end">
             <div
               className="w-full rounded-t-xl transition-all duration-700"
@@ -23,7 +23,7 @@ export function BarChart({
               title={brlShort(d.value)}
             />
           </div>
-          <span className="text-[10px] font-medium text-stone-400">{d.label}</span>
+          <span className="text-[10px] font-medium text-stone-400 truncate max-w-full">{d.label}</span>
         </div>
       ))}
     </div>
@@ -52,8 +52,8 @@ export function DualLineChart({
       })
       .join(" ");
   return (
-    <div>
-      <svg viewBox={`0 0 ${W} ${H}`} className="w-full">
+    <div className="w-full overflow-hidden">
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto max-h-48">
         {[0.25, 0.5, 0.75].map((g) => (
           <line key={g} x1={pad} x2={W - pad} y1={pad + g * (H - pad * 2)} y2={pad + g * (H - pad * 2)} stroke="#eee5f5" strokeWidth="1" />
         ))}
@@ -94,22 +94,36 @@ export function HBars({
   const colors = ["#a98fe0", "#d18a7a", "#c9a45c", "#e7b4ae", "#c9b6ee", "#e0a193"];
   return (
     <div className="space-y-3">
-      {data.map((d, i) => (
-        <div key={i}>
-          <div className="mb-1 flex items-center justify-between text-xs">
-            <span className="font-medium text-stone-600">
-              {d.emoji} {d.label}
-            </span>
-            <span className="text-stone-400">{d.value}x</span>
+      {data.map((d, i) => {
+        const isImg = d.emoji && (d.emoji.startsWith("http") || d.emoji.startsWith("data:"));
+        return (
+          <div key={i}>
+            <div className="mb-1 flex items-center justify-between text-xs gap-2">
+              <span className="font-medium text-stone-600 flex items-center gap-1.5 min-w-0 flex-1">
+                {isImg ? (
+                  <img
+                    src={d.emoji}
+                    alt=""
+                    className="h-4 w-4 shrink-0 rounded-md object-cover border border-pink-100"
+                  />
+                ) : (
+                  <span className="shrink-0 text-sm">
+                    {d.emoji && d.emoji.length <= 4 ? d.emoji : "🎀"}
+                  </span>
+                )}
+                <span className="truncate">{d.label}</span>
+              </span>
+              <span className="text-stone-400 shrink-0 font-semibold">{d.value}x</span>
+            </div>
+            <div className="h-2.5 w-full overflow-hidden rounded-full bg-white/60">
+              <div
+                className="h-full rounded-full transition-all duration-700"
+                style={{ width: `${(d.value / max) * 100}%`, background: colors[i % colors.length] }}
+              />
+            </div>
           </div>
-          <div className="h-2.5 w-full overflow-hidden rounded-full bg-white/60">
-            <div
-              className="h-full rounded-full transition-all duration-700"
-              style={{ width: `${(d.value / max) * 100}%`, background: colors[i % colors.length] }}
-            />
-          </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

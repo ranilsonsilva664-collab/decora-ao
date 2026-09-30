@@ -101,7 +101,8 @@ export default function Dashboard({ go }: { go: (p: Page) => void }) {
         (ev.pickupDate || ev.date) <= next7DaysStr &&
         ev.status === "Confirmado"
     )
-    .sort((a, b) => (a.pickupDate || a.date).localeCompare(b.pickupDate || b.date));
+    .sort((a, b) => (a.pickupDate || a.date).localeCompare(b.pickupDate || b.date))
+    .slice(0, 6);
 
   const upcomingReturns = safeEvents
     .filter(
@@ -110,7 +111,8 @@ export default function Dashboard({ go }: { go: (p: Page) => void }) {
         (ev.returnDate || ev.date) <= next7DaysStr &&
         ev.status === "Retirado"
     )
-    .sort((a, b) => (a.returnDate || a.date).localeCompare(b.returnDate || b.date));
+    .sort((a, b) => (a.returnDate || a.date).localeCompare(b.returnDate || b.date))
+    .slice(0, 6);
 
   const contractsPendingSign = contracts.filter((c) => !c.signed);
   const contractsSigned = contracts.filter((c) => c.signed);
@@ -138,7 +140,7 @@ export default function Dashboard({ go }: { go: (p: Page) => void }) {
   const topThemes = [...themes]
     .sort((a, b) => b.rentals - a.rentals)
     .slice(0, 5)
-    .map((t) => ({ label: t.name, value: t.rentals, emoji: t.photo }));
+    .map((t) => ({ label: t.name, value: t.rentals, emoji: t.photo || "🎀" }));
 
   return (
     <div className="space-y-6">
