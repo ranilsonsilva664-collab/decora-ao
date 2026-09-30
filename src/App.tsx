@@ -157,9 +157,16 @@ function Shell() {
             <p className="font-bold leading-tight text-stone-800 truncate">
               {companySettings?.tradeName || "RAYDECOR"}
             </p>
-            <p className="text-[11px] text-stone-500 truncate">
-              Código: <span className="font-bold text-stone-700">{tenantId}</span>
-            </p>
+            <div className="flex items-center gap-1.5 text-[11px] text-stone-500">
+              <span className="truncate">Conta: <b className="text-stone-700">{tenantId}</b></span>
+              <button
+                onClick={() => setPage("company")}
+                className="text-[10px] text-purple-600 hover:text-purple-700 font-bold shrink-0 hover:underline"
+                title="Redefinir chave secreta particular"
+              >
+                🔐 Alterar
+              </button>
+            </div>
           </div>
         </div>
 

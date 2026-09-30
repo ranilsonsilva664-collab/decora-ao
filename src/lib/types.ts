@@ -274,15 +274,19 @@ export interface MessageTemplate {
 }
 
 export type TenantStatus = "active" | "blocked";
+export type PlanType = "monthly" | "annual" | "test" | "custom";
 
 export interface Tenant {
-  id: string; // The access code, e.g., "MARIA123"
+  id: string; // The access code or initial ID, e.g., "MARIA123"
   name: string;
   whatsapp?: string;
+  planType?: PlanType;
   isTest?: boolean;
-  expiresAt?: string;
+  expiresAt?: string; // ISO date string of expiration
   status: TenantStatus;
   createdAt: string;
+  hasCustomKey?: boolean;
+  secretKey?: string; // Client's private redefined key
 }
 
 export interface CompanySettings {

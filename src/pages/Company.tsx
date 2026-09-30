@@ -6,12 +6,15 @@ import { useToast } from "../components/Toast";
 import { compressImage } from "../utils/image";
 
 export default function Company() {
-  const { companySettings, setCompanySettings, tenantId, logAction } = useStore();
+  const { companySettings, setCompanySettings, tenantId, currentTenant, updateTenantSecretKey, logAction } = useStore();
   const toast = useToast();
 
   const [settings, setSettings] = useState(companySettings);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [newSecretKey, setNewSecretKey] = useState("");
+  const [confirmSecretKey, setConfirmSecretKey] = useState("");
+  const [savingSecret, setSavingSecret] = useState(false);
   const logoInputRef = useRef<HTMLInputElement>(null);
 
   // Sync with store when data loads from Firestore
@@ -340,6 +343,102 @@ export default function Company() {
           value={settings.terms || ""}
           onChange={(e) => setSettings({ ...settings, terms: e.target.value })}
         />
+      </Card>
+
+      {/* Chave de Acesso & Privacidade Comercial */}
+      <Card className="space-y-4 border-2 border-lilac-200 bg-gradient-to-br from-white to-pink-50/50">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-xl">🔐</span>
+              <h3 className="text-base font-bold text-stone-800">
+                Chave de Acesso & Privacidade dos Seus Dados
+              </h3>
+            </div>
+            <p className="text-xs text-stone-500 mt-1">
+              Para sua total privacidade e confiança, você pode definir uma <b>chave secreta particular</b> só sua. Nem mesmo os administradores do sistema terão acesso a esta chave após redefini-la.
+            </p>
+          </div>
+          {currentTenant?.hasCustomKey && (
+            <span className="shrink-0 rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold text-emerald-700">
+              ✓ Chave Privada Ativa
+            </span>
+          )}
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2 rounded-2xl bg-white/70 p-4 border border-stone-200/60 text-xs">
+          <div>
+            <p className="text-stone-400 font-semibold uppercase text-[10px]">Identificador da Conta</p>
+            <p className="font-mono font-bold text-stone-800 text-sm mt-0.5">{tenantId}</p>
+          </div>
+          <div>
+            <p className="text-stone-400 font-semibold uppercase text-[10px]">Plano Atual & Validade</p>
+            <p className="font-bold text-purple-700 text-sm mt-0.5">
+              {currentTenant?.planType === "annual"
+                ? "Plano Anual"
+                : currentTenant?.planType === "monthly"
+                ? "Plano Mensal"
+                : currentTenant?.isTest
+                ? "Teste 24h"
+                : "Assinatura Ativa"}{" "}
+              {currentTenant?.expiresAt && `(Até ${new Date(currentTenant.expiresAt).toLocaleDateString("pt-BR")})`}
+            </p>
+          </div>
+        </div>
+
+        <div className="rounded-2xl bg-white p-4 border border-pink-100 space-y-3">
+          <p className="text-xs font-bold text-stone-700">
+            {currentTenant?.hasCustomKey ? "Redefinir Minha Chave Secreta:" : "Criar Minha Chave Secreta Particular:"}
+          </p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label="Nova Chave Secreta (mín. 4 caracteres)">
+              <Input
+                type="text"
+                placeholder="Ex: MINHASENHA99"
+                value={newSecretKey}
+                onChange={(e) => setNewSecretKey(e.target.value)}
+              />
+            </Field>
+            <Field label="Confirmar Nova Chave">
+              <Input
+                type="text"
+                placeholder="Digite a mesma chave"
+                value={confirmSecretKey}
+                onChange={(e) => setConfirmSecretKey(e.target.value)}
+              />
+            </Field>
+          </div>
+          <div className="flex justify-end pt-1">
+            <Button
+              type="button"
+              variant="soft"
+              disabled={savingSecret || !newSecretKey.trim()}
+              onClick={async () => {
+                if (!newSecretKey.trim()) return toast("Informe a nova chave secreta");
+                if (newSecretKey.trim().length < 4) return toast("A chave deve ter no mínimo 4 caracteres");
+                if (newSecretKey.trim() !== confirmSecretKey.trim()) return toast("As duas chaves digitadas não conferem!");
+
+                setSavingSecret(true);
+                try {
+                  const res = await updateTenantSecretKey(newSecretKey.trim());
+                  if (res.success) {
+                    toast("🔒 Chave secreta particular salva com sucesso!");
+                    setNewSecretKey("");
+                    setConfirmSecretKey("");
+                  } else {
+                    toast(res.error || "Erro ao salvar chave");
+                  }
+                } catch {
+                  toast("Erro ao salvar chave");
+                } finally {
+                  setSavingSecret(false);
+                }
+              }}
+            >
+              {savingSecret ? "Salvando Chave..." : "Salvar Chave Secreta Particular 🔒"}
+            </Button>
+          </div>
+        </div>
       </Card>
 
       <div className="flex justify-end pt-2">
