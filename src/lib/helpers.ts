@@ -23,10 +23,12 @@ export const normalizeWaPhone = (phone: string): string => {
   return clean;
 };
 
-export const waLink = (phone: string, text?: string) => {
-  const clean = normalizeWaPhone(phone);
-  if (!clean) return "#";
+export const waLink = (phone?: string, text?: string) => {
+  const clean = normalizeWaPhone(phone || "");
   const t = text ? `&text=${encodeURIComponent(text)}` : "";
+  if (!clean) {
+    return text ? `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}` : "https://api.whatsapp.com";
+  }
   return `https://api.whatsapp.com/send?phone=${clean}${t}`;
 };
 

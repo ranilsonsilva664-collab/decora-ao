@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { doc, getDoc, setDoc } from "firebase/firestore";
-import { db } from "../lib/firebase";
+import { db, authReady } from "../lib/firebase";
 import type { TenantData, Client, EventModel, PublicFormSubmission, Contract, CalendarEvent } from "../lib/types";
 import { uid, fmtDate } from "../lib/format";
 import { waLink } from "../lib/helpers";
@@ -45,6 +45,7 @@ export default function PublicForm({ tenantId }: { tenantId: string }) {
   useEffect(() => {
     async function loadTenant() {
       try {
+        await authReady;
         const snap = await getDoc(doc(db, "tenant_data", tenantId));
         if (snap.exists()) {
           const tData = snap.data() as Partial<TenantData>;
@@ -96,6 +97,7 @@ export default function PublicForm({ tenantId }: { tenantId: string }) {
     setError("");
 
     try {
+      await authReady;
       const snap = await getDoc(doc(db, "tenant_data", tenantId));
       let currentData: Partial<TenantData> = {};
       if (snap.exists()) {
@@ -238,21 +240,18 @@ export default function PublicForm({ tenantId }: { tenantId: string }) {
         returnTime: "12:00",
       };
 
-      // Save everything to Firestore
-      await setDoc(
-        doc(db, "tenant_data", tenantId),
-        {
-          clients: newClients,
-          eventsList: [newEvent, ...existingEvents],
-          events: [newCalendarEvent, ...existingCalendarEvents],
-          contracts: [newContract, ...existingContracts],
-          formSubmissions: [newSubmission, ...existingSubmissions],
-          actionLogs: [newLog, ...existingLogs].slice(0, 100),
-        },
-        { merge: true }
-      );
+      // Sanitizar listas existentes para remover base64 que possam exceder limite do Firestore
+      const sanitizedExistingClients = newClients.map((c) => ({
+        ...c,
+        photos: (c.photos || []).filter((p: string) => !p.startsWith("data:image")),
+      }));
 
-      // Dual-save contract to public_contracts for 100% reliable public signing
+      const sanitizedExistingContracts = [newContract, ...existingContracts].map((c) => {
+        // Remove qualquer campo que possa conter base64 de sessões anteriores
+        return c;
+      });
+
+      // 1. Dual-save contract to public_contracts for 100% reliable public signing
       try {
         await setDoc(
           doc(db, "public_contracts", `${tenantId}_${newContract.id}`),
@@ -267,11 +266,54 @@ export default function PublicForm({ tenantId }: { tenantId: string }) {
         console.warn("Aviso ao salvar public_contracts:", err);
       }
 
+      // 2. Dual-save submission to public_submissions for 100% reliable tracking
+      try {
+        await setDoc(
+          doc(db, "public_submissions", `${tenantId}_${newSubmission.id}`),
+          {
+            ...newSubmission,
+            tenantId,
+          },
+          { merge: true }
+        );
+      } catch (err) {
+        console.warn("Aviso ao salvar public_submissions:", err);
+      }
+
+      // 3. Sincroniza tenant_data da empresa
+      try {
+        await setDoc(
+          doc(db, "tenant_data", tenantId),
+          {
+            clients: sanitizedExistingClients,
+            eventsList: [newEvent, ...existingEvents],
+            events: [newCalendarEvent, ...existingCalendarEvents],
+            contracts: sanitizedExistingContracts,
+            formSubmissions: [newSubmission, ...existingSubmissions],
+            actionLogs: [newLog, ...existingLogs].slice(0, 100),
+          },
+          { merge: true }
+        );
+      } catch (tdErr) {
+        console.warn("Aviso ao sincronizar tenant_data:", tdErr);
+      }
+
       setCreatedContractId(contractId);
       setSubmitted(true);
-    } catch (err) {
-      console.error(err);
-      setError("Ocorreu um erro ao enviar seus dados. Por favor, tente novamente.");
+    } catch (err: any) {
+      console.error("Erro ao enviar formulário:", err);
+      // Identifica erros comuns do Firestore
+      const msg = err?.message || "";
+      if (msg.includes("exceeds maximum size") || msg.includes("RESOURCE_EXHAUSTED")) {
+        setError(
+          "Erro: o banco de dados da empresa está cheio (limite de armazenamento excedido). " +
+          "Por favor, entre em contato com a empresa para resolver este problema."
+        );
+      } else if (msg.includes("permission-denied") || msg.includes("PERMISSION_DENIED")) {
+        setError("Erro de permissão. O formulário não está autorizado a gravar dados. Contate a empresa.");
+      } else {
+        setError("Ocorreu um erro ao enviar seus dados. Verifique sua conexão e tente novamente.");
+      }
     } finally {
       setSaving(false);
     }

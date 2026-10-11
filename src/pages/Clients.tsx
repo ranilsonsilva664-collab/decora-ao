@@ -151,9 +151,10 @@ export default function Clients() {
         action={
           <div className="flex gap-2">
             <a
-              href={`https://wa.me/?text=${encodeURIComponent(
+              href={waLink(
+                "",
                 `Olá! Para agilizarmos o orçamento da sua festa Pegue e Monte, preencha este formulário rápido no seu celular:\n\n${formUrl}`
-              )}`}
+              )}
               target="_blank"
               rel="noreferrer"
             >
@@ -253,6 +254,20 @@ export default function Clients() {
                     className="inline-flex items-center gap-1 rounded-xl bg-emerald-50 px-2.5 py-1.5 text-xs font-semibold text-emerald-600 transition hover:bg-emerald-100"
                   >
                     <Icon.wa className="h-3.5 w-3.5" /> WhatsApp
+                  </a>
+                )}
+                {c.whatsapp && (
+                  <a
+                    href={waLink(
+                      c.whatsapp,
+                      `Olá ${c.name}! 💕 Para agilizarmos o orçamento e reserva da sua festa Pegue e Monte, preencha este formulário rápido pelo celular:\n\n${formUrl}`
+                    )}
+                    target="_blank"
+                    rel="noreferrer"
+                    title="Enviar formulário para esta cliente pelo WhatsApp"
+                    className="inline-flex items-center gap-1 rounded-xl bg-pink-50 px-2.5 py-1.5 text-xs font-semibold text-pink-600 transition hover:bg-pink-100"
+                  >
+                    📝 Enviar Formulário
                   </a>
                 )}
                 <button

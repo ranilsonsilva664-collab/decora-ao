@@ -6,8 +6,7 @@ import { uid, brl, fmtDate } from "../lib/format";
 import { useToast } from "../components/Toast";
 import { compressImage } from "../utils/image";
 import type { InventoryItem, Kit, KitItemComponent, ItemCondition, ItemStatus, PartyTheme, ThemeStatus } from "../lib/types";
-import { storage } from "../lib/firebase";
-import { ref, uploadString, getDownloadURL, deleteObject } from "firebase/storage";
+import { saveAppImage } from "../utils/imageStorage";
 import { getItemAvailability, getItemReservations, getKitAvailabilityForDate } from "../lib/availability";
 import { generateCatalogPdf } from "../utils/catalogPdf";
 import { copy, waLink } from "../lib/helpers";
@@ -207,17 +206,11 @@ export default function Stock({
         const p = currentPhotos[i];
         if (p.startsWith("data:image")) {
           try {
-            const fileName = `tenants/${tenantId || "default"}/stock/${item.id || uid()}/${uid()}.jpg`;
-            const sRef = ref(storage, fileName);
-            // Race with 5 second timeout to prevent infinite hang if network stalls
-            const uploadPromise = uploadString(sRef, p, "data_url").then(() => getDownloadURL(sRef));
-            const timeoutPromise = new Promise<string>((_, reject) =>
-              setTimeout(() => reject(new Error("Storage timeout")), 5000)
-            );
-            const url = await Promise.race([uploadPromise, timeoutPromise]);
+            toast(`Processando foto ${i + 1} de ${currentPhotos.filter(x => x.startsWith("data:image")).length}...`);
+            const url = await saveAppImage(p, "pecas", tenantId || undefined);
             finalPhotos.push(url);
-          } catch (storageErr) {
-            console.warn("Storage upload fallback to compressed image", storageErr);
+          } catch (uploadErr) {
+            console.warn("Aviso ao salvar foto:", uploadErr);
             finalPhotos.push(p);
           }
         } else {
@@ -225,20 +218,7 @@ export default function Stock({
         }
       }
 
-      // Cleanup removed photos safely
-      const existing = safeItems.find((x) => x.id === item.id);
-      if (existing) {
-        const oldPhotos = existing.photos || (existing.photo ? [existing.photo] : []);
-        for (const old of oldPhotos) {
-          if (old.includes("firebasestorage") && !finalPhotos.includes(old)) {
-            try {
-              await deleteObject(ref(storage, old));
-            } catch (e) {
-              console.warn("Aviso ao limpar foto antiga:", e);
-            }
-          }
-        }
-      }
+      // Cloudinary: não precisa limpar fotos antigas manualmente (URLs são permanentes)
 
       const finalItem: InventoryItem = {
         ...item,
@@ -382,33 +362,16 @@ export default function Stock({
     setKitUploading(true);
     toast("Otimizando foto do kit...");
     try {
-      const compressed = await compressImage(file, 800, 0.7);
-      if (compressed.startsWith("data:image")) {
-        try {
-          const fileName = `tenants/${tenantId || "default"}/kits/${kit.id || uid()}/${uid()}.jpg`;
-          const sRef = ref(storage, fileName);
-          const uploadPromise = uploadString(sRef, compressed, "data_url").then(() => getDownloadURL(sRef));
-          const timeoutPromise = new Promise<string>((_, reject) =>
-            setTimeout(() => reject(new Error("Storage timeout")), 5000)
-          );
-          const url = await Promise.race([uploadPromise, timeoutPromise]);
-          setKit((prev) => ({
-            ...prev,
-            photo: url,
-            photos: [url, ...(prev.photos || []).filter((p) => p !== url)],
-          }));
-          toast("Foto do kit carregada!");
-        } catch {
-          setKit((prev) => ({
-            ...prev,
-            photo: compressed,
-            photos: [compressed, ...(prev.photos || []).filter((p) => p !== compressed)],
-          }));
-          toast("Foto adicionada!");
-        }
-      }
-    } catch {
-      toast("Erro ao carregar imagem.");
+      const url = await saveAppImage(file, "kits", tenantId || undefined);
+      setKit((prev) => ({
+        ...prev,
+        photo: url,
+        photos: [url, ...(prev.photos || []).filter((p) => p !== url)],
+      }));
+      toast("Foto do kit carregada com sucesso! ✅");
+    } catch (err) {
+      console.error("Erro ao salvar foto do kit:", err);
+      toast("❌ Erro ao processar imagem.");
     } finally {
       setKitUploading(false);
     }
@@ -539,25 +502,12 @@ export default function Stock({
     setThemeUploading(true);
     toast("Otimizando foto do tema...");
     try {
-      const compressed = await compressImage(file, 600, 0.65);
-      if (compressed.startsWith("data:image")) {
-        try {
-          const fileName = `tenants/${tenantId || "default"}/themes/${themeItem.id || uid()}/${uid()}.jpg`;
-          const sRef = ref(storage, fileName);
-          const uploadPromise = uploadString(sRef, compressed, "data_url").then(() => getDownloadURL(sRef));
-          const timeoutPromise = new Promise<string>((_, reject) =>
-            setTimeout(() => reject(new Error("Storage timeout")), 5000)
-          );
-          const url = await Promise.race([uploadPromise, timeoutPromise]);
-          setThemeItem((prev) => ({ ...prev, photo: url }));
-          toast("Foto do tema carregada!");
-        } catch {
-          setThemeItem((prev) => ({ ...prev, photo: compressed }));
-          toast("Foto carregada com sucesso!");
-        }
-      }
-    } catch {
-      toast("Erro ao carregar imagem.");
+      const url = await saveAppImage(file, "temas", tenantId || undefined);
+      setThemeItem((prev) => ({ ...prev, photo: url }));
+      toast("Foto do tema carregada com sucesso! ✅");
+    } catch (err) {
+      console.error("Erro ao salvar foto do tema:", err);
+      toast("❌ Erro ao processar imagem.");
     } finally {
       setThemeUploading(false);
     }

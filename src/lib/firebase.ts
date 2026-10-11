@@ -30,7 +30,12 @@ export const db = initializeFirestore(app, {
 export const storage = getStorage(app);
 export const auth = getAuth(app);
 
-// Authenticate anonymously so Firebase Storage and security rules allow access
-signInAnonymously(auth).catch((err) => {
-  console.warn("Aviso ao autenticar anonimamente no Firebase:", err);
-});
+// Authenticate anonymously so Firebase Storage and security rules allow access.
+// authReady resolves after sign-in so that Storage uploads can await authentication.
+export const authReady: Promise<void> = signInAnonymously(auth)
+  .then(() => {
+    // Auth OK - uploads can proceed
+  })
+  .catch((err) => {
+    console.warn("Aviso ao autenticar anonimamente no Firebase:", err);
+  });

@@ -5,9 +5,7 @@ import { useStore } from "../lib/store";
 import { brl, uid } from "../lib/format";
 import { useToast } from "../components/Toast";
 import type { PartyTheme, ThemeStatus } from "../lib/types";
-import { compressImage } from "../utils/image";
-import { storage } from "../lib/firebase";
-import { ref, uploadString, getDownloadURL } from "firebase/storage";
+import { saveAppImage } from "../utils/imageStorage";
 
 const STATUSES: ThemeStatus[] = ["Disponível", "Reservado", "Em manutenção"];
 const statusColor: Record<ThemeStatus, string> = {
@@ -63,22 +61,12 @@ export default function Inventory() {
     setUploading(true);
     toast("Otimizando foto do tema...");
     try {
-      const compressed = await compressImage(file, 900, 0.82);
-      if (compressed.startsWith("data:image")) {
-        try {
-          const fileName = `tenants/${tenantId}/themes/${t.id || uid()}/${uid()}.jpg`;
-          const sRef = ref(storage, fileName);
-          await uploadString(sRef, compressed, "data_url");
-          const url = await getDownloadURL(sRef);
-          setT((prev) => ({ ...prev, photo: url }));
-          toast("Foto do tema enviada com sucesso!");
-        } catch {
-          setT((prev) => ({ ...prev, photo: compressed }));
-          toast("Foto carregada!");
-        }
-      }
-    } catch {
-      toast("Erro ao carregar imagem.");
+      const url = await saveAppImage(file, "temas", tenantId || undefined);
+      setT((prev) => ({ ...prev, photo: url }));
+      toast("Foto do tema salva com sucesso! ✅");
+    } catch (err) {
+      console.error("Erro ao salvar foto:", err);
+      toast("❌ Erro ao processar imagem.");
     } finally {
       setUploading(false);
     }
