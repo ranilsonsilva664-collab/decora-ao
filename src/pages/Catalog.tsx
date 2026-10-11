@@ -7,6 +7,7 @@ import { brl, fmtDate } from "../lib/format";
 import { waLink } from "../lib/helpers";
 import { getKitAvailabilityForDate, type KitDateAvailability } from "../lib/availability";
 import { generateCatalogPdf } from "../utils/catalogPdf";
+import { AppImage, loadTenantImages } from "../utils/imageStorage";
 
 export default function Catalog({ tenantId }: { tenantId: string }) {
   const [data, setData] = useState<TenantData | null>(null);
@@ -35,6 +36,7 @@ export default function Catalog({ tenantId }: { tenantId: string }) {
   useEffect(() => {
     async function load() {
       try {
+        loadTenantImages(tenantId);
         const snap = await getDoc(doc(db, "tenant_data", tenantId));
         const tSnap = await getDoc(doc(db, "tenants", tenantId));
 
@@ -370,10 +372,11 @@ export default function Catalog({ tenantId }: { tenantId: string }) {
                           onClick={() => setSelectedKitModal(k)}
                         >
                           {mainPhoto ? (
-                            <img
+                            <AppImage
                               src={mainPhoto}
                               alt={k.name}
                               className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                              fallbackEmoji="🎁"
                             />
                           ) : (
                             <div className="flex h-full items-center justify-center text-5xl">🎁</div>
@@ -513,10 +516,11 @@ export default function Catalog({ tenantId }: { tenantId: string }) {
                       <div>
                         <div className="relative aspect-square w-full bg-stone-100 overflow-hidden">
                           {mainPhoto ? (
-                            <img
+                            <AppImage
                               src={mainPhoto}
                               alt={item.name}
                               className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                              fallbackEmoji="📦"
                             />
                           ) : (
                             <div className="flex h-full items-center justify-center text-stone-300">
@@ -587,16 +591,18 @@ export default function Catalog({ tenantId }: { tenantId: string }) {
             {/* Imagem em destaque */}
             <div className="relative aspect-4/3 w-full rounded-2xl bg-stone-100 overflow-hidden shadow-inner">
               {selectedKitModal.photos && selectedKitModal.photos.length > 0 ? (
-                <img
+                <AppImage
                   src={selectedKitModal.photos[0]}
                   alt={selectedKitModal.name}
                   className="h-full w-full object-cover"
+                  fallbackEmoji="🎁"
                 />
               ) : selectedKitModal.photo ? (
-                <img
+                <AppImage
                   src={selectedKitModal.photo}
                   alt={selectedKitModal.name}
                   className="h-full w-full object-cover"
+                  fallbackEmoji="🎁"
                 />
               ) : (
                 <div className="flex h-full items-center justify-center text-6xl">🎁</div>

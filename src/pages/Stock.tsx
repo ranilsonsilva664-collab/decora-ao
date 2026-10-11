@@ -6,7 +6,7 @@ import { uid, brl, fmtDate } from "../lib/format";
 import { useToast } from "../components/Toast";
 import { compressImage } from "../utils/image";
 import type { InventoryItem, Kit, KitItemComponent, ItemCondition, ItemStatus, PartyTheme, ThemeStatus } from "../lib/types";
-import { saveAppImage } from "../utils/imageStorage";
+import { saveAppImage, AppImage, loadTenantImages } from "../utils/imageStorage";
 import { getItemAvailability, getItemReservations, getKitAvailabilityForDate } from "../lib/availability";
 import { generateCatalogPdf } from "../utils/catalogPdf";
 import { copy, waLink } from "../lib/helpers";
@@ -51,7 +51,7 @@ const emptyItem = (existingCount = 0): InventoryItem => ({
   condition: "Ótimo",
   notes: "",
   photos: [],
-  showInCatalog: false,
+  showInCatalog: true,
   status: "Ativo",
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),
@@ -105,6 +105,12 @@ export default function Stock({
       setActiveTab(initialTab);
     }
   }, [initialTab]);
+
+  useEffect(() => {
+    if (tenantId) {
+      loadTenantImages(tenantId);
+    }
+  }, [tenantId]);
 
   // Theme State
   const [themeSearch, setThemeSearch] = useState("");
@@ -773,7 +779,7 @@ export default function Stock({
                     {/* Image */}
                     <div className="relative h-36 w-full rounded-2xl bg-stone-100 overflow-hidden mb-3">
                       {mainPhoto ? (
-                        <img src={mainPhoto} alt={it.name} className="h-full w-full object-cover" />
+                        <AppImage src={mainPhoto} alt={it.name} className="h-full w-full object-cover" fallbackEmoji="📦" />
                       ) : (
                         <div className="flex h-full items-center justify-center text-stone-300">
                           <Icon.box className="h-10 w-10 opacity-30" />
@@ -917,7 +923,7 @@ export default function Stock({
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {filteredThemes.map((item) => {
               const roi = item.invested ? ((item.revenue - item.invested) / item.invested) * 100 : 0;
-              const isImg = item.photo && (item.photo.startsWith("http") || item.photo.startsWith("data:"));
+              const isImg = item.photo && (item.photo.startsWith("http") || item.photo.startsWith("data:") || item.photo.startsWith("img_"));
 
               return (
                 <Card
@@ -929,7 +935,7 @@ export default function Stock({
                       <div className="flex items-center gap-3">
                         <div className="grid h-14 w-14 place-items-center rounded-2xl bg-gradient-to-br from-nude-100 to-lilac-100 overflow-hidden shrink-0 border border-stone-100 shadow-sm">
                           {isImg ? (
-                            <img src={item.photo} alt={item.name} className="h-full w-full object-cover" />
+                            <AppImage src={item.photo} alt={item.name} className="h-full w-full object-cover" fallbackEmoji="🎀" />
                           ) : (
                             <span className="text-3xl">{item.photo || "🎀"}</span>
                           )}
@@ -1155,7 +1161,7 @@ export default function Stock({
 
                     <div className="relative h-32 w-full rounded-2xl bg-stone-100 overflow-hidden mb-3">
                       {mainPhoto ? (
-                        <img src={mainPhoto} alt={k.name} className="h-full w-full object-cover" />
+                        <AppImage src={mainPhoto} alt={k.name} className="h-full w-full object-cover" fallbackEmoji="🎁" />
                       ) : (
                         <div className="flex h-full items-center justify-center text-3xl">🎁</div>
                       )}
@@ -1625,7 +1631,7 @@ export default function Stock({
                     key={i}
                     className="relative aspect-square rounded-xl bg-stone-100 overflow-hidden border border-stone-200 group"
                   >
-                    <img src={p} alt="Upload" className="h-full w-full object-cover" />
+                    <AppImage src={p} alt="Upload" className="h-full w-full object-cover" fallbackEmoji="📷" />
                     {i === 0 && (
                       <span className="absolute bottom-1 left-1 bg-black/70 text-[9px] font-bold text-white px-1.5 py-0.5 rounded">
                         Capa
@@ -1752,9 +1758,9 @@ export default function Stock({
             <div className="flex flex-col sm:flex-row items-center gap-4">
               <div className="relative h-28 w-28 shrink-0 rounded-2xl bg-white border border-stone-200 overflow-hidden shadow-sm flex items-center justify-center">
                 {kit.photos && kit.photos.length > 0 ? (
-                  <img src={kit.photos[0]} alt="Kit" className="h-full w-full object-cover" />
+                  <AppImage src={kit.photos[0]} alt="Kit" className="h-full w-full object-cover" fallbackEmoji="🎁" />
                 ) : kit.photo ? (
-                  <img src={kit.photo} alt="Kit" className="h-full w-full object-cover" />
+                  <AppImage src={kit.photo} alt="Kit" className="h-full w-full object-cover" fallbackEmoji="🎁" />
                 ) : (
                   <span className="text-3xl text-stone-300">🎁</span>
                 )}
@@ -2114,8 +2120,8 @@ export default function Stock({
             ) : themePhotoType === "upload" ? (
               <div className="flex items-center gap-4 p-4 bg-stone-50 rounded-2xl border border-stone-200">
                 <div className="h-20 w-20 rounded-2xl bg-white border border-stone-200 overflow-hidden grid place-items-center shrink-0">
-                  {themeItem.photo && (themeItem.photo.startsWith("http") || themeItem.photo.startsWith("data:")) ? (
-                    <img src={themeItem.photo} alt="Prévia" className="h-full w-full object-cover" />
+                  {themeItem.photo && (themeItem.photo.startsWith("http") || themeItem.photo.startsWith("data:") || themeItem.photo.startsWith("img_")) ? (
+                    <AppImage src={themeItem.photo} alt="Prévia" className="h-full w-full object-cover" fallbackEmoji="🎀" />
                   ) : (
                     <span className="text-3xl">{themeItem.photo || "📷"}</span>
                   )}

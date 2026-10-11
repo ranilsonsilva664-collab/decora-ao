@@ -21,6 +21,7 @@ import type {
 import { seedTemplates } from "./seed";
 import { uid } from "./format";
 import { sanitizeForFirestore, sanitizeContract } from "./firestoreUtils";
+import { loadTenantImages } from "../utils/imageStorage";
 
 const DEFAULT_CONTRACT_RULES =
   "*Regras de uso:*\n" +
@@ -146,6 +147,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     }
 
     setIsLoading(true);
+    loadTenantImages(tenantId);
 
     // 1. Listen to tenant account info (status, plan expiration, secret key)
     const unsubTenant = onSnapshot(doc(db, "tenants", tenantId), (tSnap) => {

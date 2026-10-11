@@ -5,7 +5,7 @@ import { useStore } from "../lib/store";
 import { brl, uid } from "../lib/format";
 import { useToast } from "../components/Toast";
 import type { PartyTheme, ThemeStatus } from "../lib/types";
-import { saveAppImage } from "../utils/imageStorage";
+import { saveAppImage, AppImage } from "../utils/imageStorage";
 
 const STATUSES: ThemeStatus[] = ["Disponível", "Reservado", "Em manutenção"];
 const statusColor: Record<ThemeStatus, string> = {
@@ -163,7 +163,7 @@ export default function Inventory() {
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {filteredThemes.map((item) => {
           const roi = item.invested ? ((item.revenue - item.invested) / item.invested) * 100 : 0;
-          const isImg = item.photo && (item.photo.startsWith("http") || item.photo.startsWith("data:"));
+          const isImg = item.photo && (item.photo.startsWith("http") || item.photo.startsWith("data:") || item.photo.startsWith("img_"));
 
           return (
             <Card
@@ -175,7 +175,7 @@ export default function Inventory() {
                   <div className="flex items-center gap-3">
                     <div className="grid h-14 w-14 place-items-center rounded-2xl bg-gradient-to-br from-nude-100 to-lilac-100 overflow-hidden shrink-0 border border-stone-100 shadow-sm">
                       {isImg ? (
-                        <img src={item.photo} alt={item.name} className="h-full w-full object-cover" />
+                        <AppImage src={item.photo} alt={item.name} className="h-full w-full object-cover" fallbackEmoji="🎀" />
                       ) : (
                         <span className="text-3xl">{item.photo || "🎀"}</span>
                       )}
@@ -323,8 +323,8 @@ export default function Inventory() {
             ) : (
               <div className="flex items-center gap-4 p-4 bg-stone-50 rounded-2xl border border-stone-200">
                 <div className="h-20 w-20 rounded-2xl bg-white border border-stone-200 overflow-hidden grid place-items-center shrink-0">
-                  {t.photo && (t.photo.startsWith("http") || t.photo.startsWith("data:")) ? (
-                    <img src={t.photo} alt="Prévia" className="h-full w-full object-cover" />
+                  {t.photo && (t.photo.startsWith("http") || t.photo.startsWith("data:") || t.photo.startsWith("img_")) ? (
+                    <AppImage src={t.photo} alt="Prévia" className="h-full w-full object-cover" fallbackEmoji="🎀" />
                   ) : (
                     <span className="text-3xl">{t.photo || "📷"}</span>
                   )}

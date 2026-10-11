@@ -3,6 +3,7 @@ import { jsPDF } from "jspdf";
 import type { Kit, CompanySettings } from "../lib/types";
 import { brl, fmtDate } from "../lib/format";
 import type { KitDateAvailability } from "../lib/availability";
+import { fetchSingleImage } from "./imageStorage";
 
 export interface GenerateCatalogPdfOptions {
   kits: Kit[];
@@ -15,7 +16,12 @@ export interface GenerateCatalogPdfOptions {
 // Convert image URL to local base64 safely to prevent canvas taint issues
 async function getSafeBase64(src: string): Promise<string> {
   if (!src) return "";
-  if (src.startsWith("data:image")) return src;
+  let resolvedSrc = src;
+  if (!src.startsWith("http") && !src.startsWith("data:")) {
+    resolvedSrc = await fetchSingleImage(src);
+    if (!resolvedSrc) return "";
+  }
+  if (resolvedSrc.startsWith("data:image")) return resolvedSrc;
 
   return new Promise((resolve) => {
     const img = new Image();
