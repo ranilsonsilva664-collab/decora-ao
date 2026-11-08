@@ -214,10 +214,10 @@ export default function Dashboard({ go }: { go: (p: Page) => void }) {
           onClick={() => go("finance")}
         />
         <ClickableStat
-          label="Pagamentos Pendentes"
+          label="Falta Pagar (Em Aberto)"
           value={brl(pendentes + atrasados)}
           emoji="⏳"
-          hint={atrasados > 0 ? `${brl(atrasados)} atrasado` : undefined}
+          hint={atrasados > 0 ? `${brl(atrasados)} atrasado` : "Restante de festas"}
           trend={atrasados > 0 ? "down" : undefined}
           onClick={() => go("finance")}
         />

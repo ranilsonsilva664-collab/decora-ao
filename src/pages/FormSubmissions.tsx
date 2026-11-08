@@ -5,7 +5,8 @@ import { useStore } from "../lib/store";
 import { brl, fmtDate, uid } from "../lib/format";
 import { copy, waLink } from "../lib/helpers";
 import { useToast } from "../components/Toast";
-import { sanitizeContract } from "../lib/firestoreUtils";
+import { sanitizeContract, enrichContractData, syncContractFinancials } from "../lib/firestoreUtils";
+import { downloadContractPdf } from "../utils/contractPdf";
 import type { PublicFormSubmission, Contract } from "../lib/types";
 
 export default function FormSubmissions() {
@@ -14,8 +15,12 @@ export default function FormSubmissions() {
     setFormSubmissions,
     contracts,
     setContracts,
+    clients,
+    eventsList,
     events,
     setEvents,
+    transactions,
+    setTransactions,
     companySettings,
     contractRules,
     tenantId,
@@ -56,6 +61,17 @@ export default function FormSubmissions() {
 
   const generateContractForSubmission = (sub: PublicFormSubmission) => {
     const contractId = uid();
+    const fullAddress = [
+      sub.address,
+      sub.number ? `nº ${sub.number}` : "",
+      sub.complement,
+      sub.neighborhood,
+      sub.city,
+      sub.state,
+    ]
+      .filter(Boolean)
+      .join(", ");
+
     const newContract: Contract = sanitizeContract({
       id: contractId,
       clientId: sub.clientId || "",
@@ -63,8 +79,22 @@ export default function FormSubmissions() {
       whatsapp: sub.whatsapp.trim(),
       clientPhone: sub.whatsapp.trim(),
       cpf: sub.cpf.trim(),
+      email: (sub.email || "").trim(),
+      cep: (sub.cep || "").trim(),
+      address: (sub.address || "").trim(),
+      number: (sub.number || "").trim(),
+      complement: (sub.complement || "").trim(),
+      neighborhood: (sub.neighborhood || "").trim(),
+      city: (sub.city || "").trim(),
+      state: (sub.state || "").trim(),
       eventId: (sub as any).eventId || "",
+      eventType: sub.eventType || "Aniversário",
+      birthdayPerson: (sub.birthdayPerson || "").trim(),
+      age: (sub.age || "").trim(),
       partyDate: sub.eventDate,
+      partyTime: sub.eventTime || "14:00",
+      partyLocation: sub.eventLocation || fullAddress,
+      notes: (sub.notes || "").trim(),
       theme: sub.theme.trim(),
       items: [],
       value: 0,
@@ -118,10 +148,38 @@ export default function FormSubmissions() {
 
   const saveEditedContract = () => {
     if (!editingContract) return;
-    const sanitized = sanitizeContract(editingContract);
+    const sanitized = enrichContractData(
+      sanitizeContract(editingContract),
+      clients,
+      safeSubmissions,
+      eventsList
+    );
     setContracts(contracts.map((c) => (c.id === sanitized.id ? sanitized : c)));
+
+    if (sanitized.value > 0 || sanitized.deposit > 0) {
+      const updatedTx = syncContractFinancials(sanitized, transactions);
+      setTransactions(updatedTx);
+    }
+
     setEditingContract(null);
-    toast("Contrato atualizado com sucesso! ✨");
+    toast("Contrato atualizado e valores sincronizados com o Financeiro! ✨");
+  };
+
+  const handleDownloadPdf = async (contract: Contract) => {
+    try {
+      toast("Gerando PDF com todos os dados do formulário...");
+      const fullContract = enrichContractData(contract, clients, safeSubmissions, eventsList);
+      await downloadContractPdf({
+        contract: fullContract,
+        companySettings,
+        contractRules,
+        tenantId,
+        onProgress: (st) => toast(st),
+      });
+    } catch (e) {
+      console.error(e);
+      toast("Erro ao gerar PDF do contrato.");
+    }
   };
 
   return (
@@ -215,9 +273,13 @@ export default function FormSubmissions() {
                   <p>
                     📱 <b>WhatsApp:</b> {sub.whatsapp}
                   </p>
-                  {sub.city && (
+                  {(sub.eventLocation || sub.address || sub.city) && (
                     <p>
-                      📍 <b>Local:</b> {sub.city}/{sub.state}
+                      📍 <b>Endereço Festa:</b>{" "}
+                      {sub.eventLocation ||
+                        [sub.address, sub.number ? `nº ${sub.number}` : "", sub.neighborhood, sub.city, sub.state]
+                          .filter(Boolean)
+                          .join(", ")}
                     </p>
                   )}
                   {sub.notes && <p className="line-clamp-2 text-stone-500 italic mt-1">"{sub.notes}"</p>}
@@ -261,9 +323,20 @@ export default function FormSubmissions() {
 
                     <div className="flex gap-2">
                       <Button
+                        variant="gold"
+                        className="!py-1.5 !px-2.5 text-xs"
+                        onClick={() => handleDownloadPdf(contract)}
+                      >
+                        <Icon.pdf className="h-3.5 w-3.5" /> PDF
+                      </Button>
+                      <Button
                         variant="soft"
                         className="flex-1 !py-1.5 text-xs"
-                        onClick={() => setEditingContract(contract)}
+                        onClick={() =>
+                          setEditingContract(
+                            enrichContractData(contract, clients, safeSubmissions, eventsList)
+                          )
+                        }
                       >
                         ✏️ Ajustar Contrato
                       </Button>

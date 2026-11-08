@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { StoreProvider, useStore } from "./lib/store";
 import { ToastProvider } from "./components/Toast";
+import { PartyPaymentReminder } from "./components/PartyPaymentReminder";
 import { Icon } from "./components/icons";
 import { cn } from "./utils/cn";
 import Dashboard from "./pages/Dashboard";
@@ -268,6 +269,7 @@ function Shell() {
 
         {/* Page Content */}
         <main className="mx-auto w-full max-w-7xl flex-1 p-4 pb-24 sm:p-6 lg:pb-8">
+          <PartyPaymentReminder />
           {renderPage()}
         </main>
       </div>

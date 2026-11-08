@@ -7,7 +7,7 @@ import { copy, waLink, normalizeWaPhone } from "../lib/helpers";
 import { useToast } from "../components/Toast";
 import type { Contract, ContractStatus } from "../lib/types";
 import { downloadContractPdf } from "../utils/contractPdf";
-import { sanitizeContract } from "../lib/firestoreUtils";
+import { sanitizeContract, enrichContractData, syncContractFinancials } from "../lib/firestoreUtils";
 
 export default function Contracts() {
   const {
@@ -18,6 +18,10 @@ export default function Contracts() {
     themes,
     events,
     setEvents,
+    eventsList,
+    formSubmissions,
+    transactions,
+    setTransactions,
     companySettings,
     contractRules,
     setContractRules,
@@ -90,30 +94,43 @@ export default function Contracts() {
   const save = () => {
     if (!c.clientName.trim()) return toast("Informe a cliente");
     const exists = contracts.some((x) => x.id === c.id);
-    const sanitized = sanitizeContract({
-      ...c,
-      clientName: c.clientName.trim(),
-      customTerms: c.customTerms || companySettings.terms || contractRules || "",
-    });
-    const updated = exists ? contracts.map((x) => (x.id === c.id ? sanitized : x)) : [sanitized, ...contracts];
+    const enriched = enrichContractData(
+      sanitizeContract({
+        ...c,
+        clientName: c.clientName.trim(),
+        customTerms: c.customTerms || companySettings.terms || contractRules || "",
+      }),
+      clients,
+      formSubmissions,
+      eventsList
+    );
+    const updated = exists
+      ? contracts.map((x) => (x.id === c.id ? enriched : x))
+      : [enriched, ...contracts];
     setContracts(updated);
 
+    // REQUISITO: Sincronizar Sinal (Pago) e Valor em Aberto (Falta Pagar) com o Financeiro
+    if (enriched.value > 0 || enriched.deposit > 0) {
+      const updatedTx = syncContractFinancials(enriched, transactions);
+      setTransactions(updatedTx);
+    }
+
     // REQUISITO: Assim que o contrato for gerado ir automaticamente para agenda na data preenchida
-    if (sanitized.partyDate) {
+    if (enriched.partyDate) {
       const alreadyScheduled = (events || []).some(
         (ev) =>
-          ev.date === sanitized.partyDate &&
-          ev.clientName.trim().toLowerCase() === sanitized.clientName.trim().toLowerCase()
+          ev.date === enriched.partyDate &&
+          ev.clientName.trim().toLowerCase() === enriched.clientName.trim().toLowerCase()
       );
       if (!alreadyScheduled) {
         const newCalendarEvent = {
           id: uid(),
-          theme: sanitized.theme || "Decoração Pegue e Monte",
-          clientName: sanitized.clientName,
-          date: sanitized.partyDate,
-          setupTime: sanitized.pickupTime || "09:00",
-          pickupTime: sanitized.pickupTime || "09:00",
-          returnTime: sanitized.returnTime || "12:00",
+          theme: enriched.theme || "Decoração Pegue e Monte",
+          clientName: enriched.clientName,
+          date: enriched.partyDate,
+          setupTime: enriched.pickupTime || "09:00",
+          pickupTime: enriched.pickupTime || "09:00",
+          returnTime: enriched.returnTime || "12:00",
         };
         setEvents([newCalendarEvent, ...(events || [])]);
       }
@@ -122,9 +139,15 @@ export default function Contracts() {
     setOpen(false);
     logAction(
       exists ? "Contrato Atualizado" : "Novo Contrato Gerado",
-      `${sanitized.clientName} - ${sanitized.theme} (${brl(sanitized.value)})`
+      `${enriched.clientName} - ${enriched.theme} (Total: ${brl(enriched.value)} | Sinal Pago: ${brl(
+        enriched.deposit
+      )} | Falta Pagar: ${brl(Math.max(0, enriched.value - enriched.deposit))})`
     );
-    toast(exists ? "Contrato atualizado!" : "Contrato gerado e agendado no calendário!");
+    toast(
+      exists
+        ? "Contrato e financeiro atualizados!"
+        : "Contrato gerado, agendado e lançado no Financeiro (Sinal Pago / Falta Pagar)!"
+    );
   };
 
   // Canvas Handlers
@@ -186,13 +209,14 @@ export default function Contracts() {
     toast("Contrato assinado digitalmente! ✍️");
   };
 
-  // REQUISITO: BAIXAR PDF PROFISSIONAL DE CONTRATO (DIRETO NO DISPOSITIVO)
+  // REQUISITO: BAIXAR PDF PROFISSIONAL DE CONTRATO (COM TODAS AS INFORMAÇÕES DO CLIENTE DO WHATSAPP ATÉ O ENDEREÇO DA FESTA)
   const handleDownloadPdf = async (item: Contract) => {
     try {
       setDownloadingId(item.id);
-      toast("Gerando arquivo PDF...");
+      toast("Gerando arquivo PDF completo...");
+      const fullContract = enrichContractData(item, clients, formSubmissions, eventsList);
       await downloadContractPdf({
-        contract: item,
+        contract: fullContract,
         companySettings,
         contractRules,
         tenantId,
@@ -290,11 +314,12 @@ export default function Contracts() {
 
       {/* Contracts List */}
       <div className="grid gap-4 lg:grid-cols-2">
-        {contracts.map((item) => {
+        {contracts.map((rawItem) => {
+          const item = enrichContractData(rawItem, clients, formSubmissions, eventsList);
           const client = clients.find(
             (cl) => cl.name.toLowerCase() === item.clientName.toLowerCase()
           );
-          const signUrl = getSignLink(item.id);
+          const remainingVal = Math.max(0, (item.value || 0) - (item.deposit || 0));
 
           return (
             <Card key={item.id} className="animate-rise flex flex-col justify-between">
@@ -328,7 +353,13 @@ export default function Contracts() {
                   )}
                 </div>
 
-                <div className="mt-3 grid grid-cols-3 gap-2 text-center text-xs">
+                {item.partyLocation && (
+                  <p className="mt-1.5 text-[11px] text-stone-600 bg-white/60 px-2.5 py-1.5 rounded-xl border border-stone-100 truncate">
+                    📍 <b>Local da Festa:</b> {item.partyLocation}
+                  </p>
+                )}
+
+                <div className="mt-3 grid grid-cols-4 gap-2 text-center text-xs">
                   <div className="rounded-xl bg-white/60 py-2">
                     <p className="text-stone-400 text-[10px]">Data Festa</p>
                     <p className="font-semibold text-stone-700">{fmtDate(item.partyDate)}</p>
@@ -337,9 +368,13 @@ export default function Contracts() {
                     <p className="text-stone-400 text-[10px]">Valor Total</p>
                     <p className="font-semibold text-stone-700">{brl(item.value)}</p>
                   </div>
-                  <div className="rounded-xl bg-white/60 py-2">
-                    <p className="text-stone-400 text-[10px]">Sinal Pago</p>
-                    <p className="font-semibold text-emerald-600">{brl(item.deposit)}</p>
+                  <div className="rounded-xl bg-emerald-50/70 py-2 border border-emerald-100">
+                    <p className="text-emerald-700 text-[10px] font-semibold">Sinal (Pago)</p>
+                    <p className="font-bold text-emerald-600">{brl(item.deposit)}</p>
+                  </div>
+                  <div className="rounded-xl bg-amber-50/70 py-2 border border-amber-100">
+                    <p className="text-amber-700 text-[10px] font-semibold">Falta Pagar</p>
+                    <p className="font-bold text-amber-600">{brl(remainingVal)}</p>
                   </div>
                 </div>
 
@@ -398,7 +433,7 @@ export default function Contracts() {
 
                 <button
                   onClick={() => {
-                    setC(item);
+                    setC(enrichContractData(rawItem, clients, formSubmissions, eventsList));
                     setOpen(true);
                   }}
                   className="ml-auto rounded-xl bg-white/80 px-3 py-1.5 text-xs font-semibold text-stone-600 hover:bg-white shadow-sm"
@@ -449,12 +484,40 @@ export default function Contracts() {
                   const found = clients.find(
                     (cl) => cl.name.trim().toLowerCase() === name.trim().toLowerCase()
                   );
+                  const foundSub = (formSubmissions || []).find(
+                    (s) => s.clientName.trim().toLowerCase() === name.trim().toLowerCase()
+                  );
+                  const resAddress = found
+                    ? [
+                        found.address,
+                        found.number ? `nº ${found.number}` : "",
+                        found.complement,
+                        found.neighborhood,
+                        found.city,
+                        found.state,
+                      ]
+                        .filter(Boolean)
+                        .join(", ")
+                    : "";
                   setC({
                     ...c,
                     clientName: name,
-                    cpf: found?.cpf || c.cpf,
-                    clientId: found?.id || c.clientId,
-                    whatsapp: found?.whatsapp || found?.phone || c.whatsapp,
+                    cpf: found?.cpf || foundSub?.cpf || c.cpf,
+                    clientId: found?.id || foundSub?.clientId || c.clientId,
+                    whatsapp: found?.whatsapp || found?.phone || foundSub?.whatsapp || c.whatsapp,
+                    email: found?.email || foundSub?.email || c.email,
+                    cep: found?.cep || foundSub?.cep || c.cep,
+                    address: found?.address || foundSub?.address || c.address,
+                    number: found?.number || foundSub?.number || c.number,
+                    complement: found?.complement || foundSub?.complement || c.complement,
+                    neighborhood: found?.neighborhood || foundSub?.neighborhood || c.neighborhood,
+                    city: found?.city || foundSub?.city || c.city,
+                    state: found?.state || foundSub?.state || c.state,
+                    partyLocation: foundSub?.eventLocation || c.partyLocation || resAddress,
+                    birthdayPerson: foundSub?.birthdayPerson || c.birthdayPerson,
+                    age: foundSub?.age || found?.age || c.age,
+                    partyTime: foundSub?.eventTime || c.partyTime || "14:00",
+                    notes: foundSub?.notes || found?.notes || c.notes,
                   });
                 }}
                 placeholder="Selecione ou digite a cliente"
@@ -484,11 +547,35 @@ export default function Contracts() {
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Endereço / Local da Festa (aparece no PDF)">
+              <Input
+                value={c.partyLocation || ""}
+                onChange={(e) => setC({ ...c, partyLocation: e.target.value })}
+                placeholder="Rua, nº, bairro, salão de festas ou condomínio..."
+              />
+            </Field>
+            <Field label="Endereço Residencial da Cliente">
+              <Input
+                value={c.address || ""}
+                onChange={(e) => setC({ ...c, address: e.target.value })}
+                placeholder="Rua, nº, bairro, cidade..."
+              />
+            </Field>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-3">
             <Field label="Data da Festa">
               <Input
                 type="date"
                 value={c.partyDate}
                 onChange={(e) => setC({ ...c, partyDate: e.target.value })}
+              />
+            </Field>
+            <Field label="Horário da Festa">
+              <Input
+                type="time"
+                value={c.partyTime || "14:00"}
+                onChange={(e) => setC({ ...c, partyTime: e.target.value })}
               />
             </Field>
             <Field label="Tema Contratado">
@@ -503,6 +590,30 @@ export default function Contracts() {
                   <option key={t.id} value={t.name} />
                 ))}
               </datalist>
+            </Field>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-3">
+            <Field label="Aniversariante (opcional)">
+              <Input
+                value={c.birthdayPerson || ""}
+                onChange={(e) => setC({ ...c, birthdayPerson: e.target.value })}
+                placeholder="Ex: Maria Clara"
+              />
+            </Field>
+            <Field label="Idade (opcional)">
+              <Input
+                value={c.age || ""}
+                onChange={(e) => setC({ ...c, age: e.target.value })}
+                placeholder="Ex: 5 anos"
+              />
+            </Field>
+            <Field label="E-mail da Cliente (opcional)">
+              <Input
+                value={c.email || ""}
+                onChange={(e) => setC({ ...c, email: e.target.value })}
+                placeholder="cliente@email.com"
+              />
             </Field>
           </div>
 

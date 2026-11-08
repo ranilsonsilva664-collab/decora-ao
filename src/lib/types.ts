@@ -214,9 +214,23 @@ export interface Contract {
   whatsapp?: string;
   clientPhone?: string;
   cpf: string;
+  email?: string;
+  cep?: string;
+  address?: string;
+  number?: string;
+  complement?: string;
+  neighborhood?: string;
+  city?: string;
+  state?: string;
   eventId?: string;
   quoteId?: string;
+  eventType?: string;
+  birthdayPerson?: string;
+  age?: string;
   partyDate: string;
+  partyTime?: string;
+  partyLocation?: string;
+  notes?: string;
   theme: string;
   items?: EventRentedItem[];
   value: number;
@@ -234,6 +248,7 @@ export interface Contract {
   signedAt?: string;
   signerIp?: string;
   status?: ContractStatus;
+  paymentRemainderConfirmed?: boolean;
   createdAt: string;
   customTerms?: string;
   pdfGeneratedAt?: string;
@@ -260,11 +275,24 @@ export interface Transaction {
   client?: string;
   eventId?: string;
   contractId?: string;
+  quoteId?: string;
+  paymentPart?: "sinal" | "restante" | "integral";
+  partyDate?: string;
   amount: number;
   date: string;
   method?: string;
   status: "Pago" | "Pendente" | "Atrasado";
   receiptGeneratedAt?: string;
+  // Campos específicos para Saídas profissionais (Balões e Locação de Acervo com Outro Decorador)
+  expenseSubtype?: "baloes" | "sublocacao" | "outros";
+  partnerDecoratorName?: string;
+  partnerDecoratorPhone?: string;
+  partnerRentedItems?: string;
+  partnerPickupDate?: string;
+  partnerReturnDate?: string;
+  balloonColors?: string;
+  balloonSupplier?: string;
+  notes?: string;
 }
 
 export interface MessageTemplate {
@@ -332,6 +360,7 @@ export interface PublicFormSubmission {
   age?: string;
   eventDate: string;
   eventTime?: string;
+  eventLocation?: string;
   theme: string;
   notes?: string;
   status: "Novo" | "Processado" | "Arquivado";

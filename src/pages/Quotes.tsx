@@ -7,7 +7,7 @@ import { copy, waLink } from "../lib/helpers";
 import { useToast } from "../components/Toast";
 import type { Quote, QuoteStatus, EventRentedItem, Contract } from "../lib/types";
 import { getItemAvailability, checkKitAvailability } from "../lib/availability";
-import { sanitizeContract } from "../lib/firestoreUtils";
+import { sanitizeContract, enrichContractData, syncContractFinancials } from "../lib/firestoreUtils";
 
 const STATUSES: QuoteStatus[] = [
   "Rascunho",
@@ -59,12 +59,16 @@ export default function Quotes() {
     setQuotes,
     clients,
     eventsList,
+    setEventsList,
     inventoryItems,
     kits,
     contracts,
     setContracts,
     events,
     setEvents,
+    transactions,
+    setTransactions,
+    formSubmissions,
     companySettings,
     contractRules,
     logAction,
@@ -206,6 +210,25 @@ export default function Quotes() {
     const exists = quotes.some((x) => x.id === q.id);
     const updated = exists ? quotes.map((x) => (x.id === q.id ? q : x)) : [q, ...quotes];
     setQuotes(updated);
+
+    // Se o orçamento foi marcado como Aprovado ou Convertido em contrato, sincroniza o sinal (Pago) e o aberto (Falta Pagar) no financeiro
+    if (q.status === "Aprovado" || q.status === "Convertido em contrato") {
+      const linkedContract = contracts.find((c) => c.quoteId === q.id);
+      const tempContract: Contract = sanitizeContract({
+        id: linkedContract?.id || `quote-${q.id}`,
+        clientId: q.clientId || "",
+        clientName: q.clientName,
+        quoteId: q.id,
+        eventId: q.eventId || "",
+        partyDate: q.date,
+        theme: q.theme,
+        value: calcTotal(q),
+        deposit: q.deposit || 0,
+      });
+      const updatedTx = syncContractFinancials(tempContract, transactions, q.paymentMethod || "Pix");
+      setTransactions(updatedTx);
+    }
+
     setOpen(false);
     logAction(
       exists ? "Orçamento Atualizado" : "Novo Orçamento Criado",
@@ -214,7 +237,7 @@ export default function Quotes() {
     toast(exists ? "Orçamento atualizado!" : "Orçamento criado!");
   };
 
-  // REQUISITO 18: TRANSFORMAR ORÇAMENTO EM CONTRATO
+  // REQUISITO 18: FECHAR DECORAÇÃO / TRANSFORMAR ORÇAMENTO EM CONTRATO E LANÇAR NO FINANCEIRO
   const transformToContract = (item: Quote) => {
     const client = clients.find(
       (c) =>
@@ -222,7 +245,7 @@ export default function Quotes() {
         c.name.trim().toLowerCase() === (item.clientName || "").trim().toLowerCase()
     );
 
-    const newContract: Contract = sanitizeContract({
+    const baseContract: Contract = sanitizeContract({
       id: uid(),
       clientId: item.clientId || client?.id || "",
       clientName: item.clientName || "",
@@ -231,6 +254,7 @@ export default function Quotes() {
       quoteId: item.id || "",
       eventId: item.eventId || "",
       partyDate: item.date,
+      partyTime: item.time || "14:00",
       theme: item.theme,
       items: item.items || [],
       value: calcTotal(item),
@@ -245,9 +269,12 @@ export default function Quotes() {
       signed: false,
       signature: "",
       status: "Pendente",
+      notes: item.notes || "",
       customTerms: companySettings.terms || contractRules || "",
       createdAt: new Date().toISOString().slice(0, 10),
     });
+
+    const newContract = enrichContractData(baseContract, clients, formSubmissions, eventsList);
 
     // Update quote status to "Convertido em contrato"
     const updatedQuotes = quotes.map((x) =>
@@ -258,7 +285,15 @@ export default function Quotes() {
     // Add new contract
     setContracts([newContract, ...contracts]);
 
-    // REQUISITO: Automaticamente ir para a agenda na data preenchida
+    // REQUISITO: Enviar valor do Sinal (Pago) e Valor em Aberto (Falta Pagar) automaticamente para o Financeiro
+    const updatedTransactions = syncContractFinancials(
+      newContract,
+      transactions,
+      item.paymentMethod || "Pix"
+    );
+    setTransactions(updatedTransactions);
+
+    // REQUISITO: Automaticamente ir para a agenda e eventos na data preenchida
     if (newContract.partyDate) {
       const alreadyScheduled = (events || []).some(
         (ev) =>
@@ -277,13 +312,50 @@ export default function Quotes() {
         };
         setEvents([calEv, ...(events || [])]);
       }
+
+      const alreadyInEventsList = (eventsList || []).some(
+        (ev) =>
+          ev.date === newContract.partyDate &&
+          ev.clientName.trim().toLowerCase() === newContract.clientName.trim().toLowerCase()
+      );
+      if (!alreadyInEventsList) {
+        const newEvModel = {
+          id: newContract.eventId || uid(),
+          clientId: newContract.clientId || "",
+          clientName: newContract.clientName,
+          type: (newContract.eventType as any) || "Aniversário",
+          birthdayPerson: newContract.birthdayPerson || "",
+          age: newContract.age || "",
+          theme: newContract.theme || "Decoração Pegue e Monte",
+          date: newContract.partyDate,
+          time: newContract.partyTime || "14:00",
+          location: newContract.partyLocation || "",
+          pickupDate: newContract.pickupDate || newContract.partyDate,
+          pickupTime: newContract.pickupTime || "09:00",
+          returnDate: newContract.returnDate || newContract.partyDate,
+          returnTime: newContract.returnTime || "12:00",
+          status: "Confirmado" as const,
+          items: newContract.items || [],
+          quoteId: item.id,
+          contractId: newContract.id,
+          notes: newContract.notes || "",
+          createdAt: new Date().toISOString(),
+        };
+        setEventsList([newEvModel, ...(eventsList || [])]);
+      }
     }
 
     logAction(
-      "Orçamento Convertido em Contrato",
-      `Orçamento de ${item.clientName} transformado no contrato #${newContract.id}`
+      "Decoração Fechada e Lançada no Financeiro",
+      `${item.clientName} - Sinal Pago: ${brl(newContract.deposit)} | Falta Pagar: ${brl(
+        Math.max(0, newContract.value - newContract.deposit)
+      )}`
     );
-    toast("✨ Contrato gerado e agendado no calendário com sucesso!");
+    toast(
+      `✨ Decoração fechada! Sinal (${brl(newContract.deposit)}) como Pago e Restante (${brl(
+        Math.max(0, newContract.value - newContract.deposit)
+      )}) como Falta Pagar no Financeiro!`
+    );
   };
 
   const doCopy = async (item: Quote) => {
@@ -537,15 +609,19 @@ export default function Quotes() {
 
               {/* Action Buttons */}
               <div className="mt-4 pt-3 border-t border-stone-100 flex flex-wrap gap-2">
-                {/* Botão de Transformar em Contrato (Requisito 18) */}
-                {item.status !== "Convertido em contrato" && (
+                {/* Botão de Fechar Decoração / Transformar em Contrato (Requisito 18) */}
+                {item.status !== "Convertido em contrato" ? (
                   <Button
                     variant="primary"
                     className="!py-1.5 !px-3 text-xs w-full sm:w-auto"
                     onClick={() => transformToContract(item)}
                   >
-                    📑 Transformar em Contrato
+                    ✅ Fechar Decoração / Contrato
                   </Button>
+                ) : (
+                  <span className="inline-flex items-center gap-1 rounded-xl bg-emerald-50 border border-emerald-200 px-2.5 py-1 text-[11px] font-bold text-emerald-700">
+                    ✓ Lançado no Financeiro (Sinal Pago / Falta Pagar)
+                  </span>
                 )}
 
                 <Button

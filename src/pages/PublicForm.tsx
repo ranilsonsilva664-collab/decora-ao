@@ -166,6 +166,19 @@ export default function PublicForm({ tenantId }: { tenantId: string }) {
       // 3. GENERATE CONTRACT AUTOMATICALLY FROM FORM DATA
       const contractId = uid();
       const existingContracts = currentData.contracts || [];
+      const fullResAddress = [
+        address.trim(),
+        number.trim() ? `nº ${number.trim()}` : "",
+        complement.trim(),
+        neighborhood.trim(),
+        city.trim(),
+        state.trim(),
+      ]
+        .filter(Boolean)
+        .join(", ");
+
+      const resolvedPartyLocation = eventLocation.trim() || fullResAddress;
+
       const newContract: Contract = sanitizeContract({
         id: contractId,
         clientId,
@@ -173,8 +186,22 @@ export default function PublicForm({ tenantId }: { tenantId: string }) {
         whatsapp: whatsapp.trim(),
         clientPhone: whatsapp.trim(),
         cpf: cpf.trim(),
+        email: email.trim(),
+        cep: cep.trim(),
+        address: address.trim(),
+        number: number.trim(),
+        complement: complement.trim(),
+        neighborhood: neighborhood.trim(),
+        city: city.trim(),
+        state: state.trim(),
         eventId: newEvent.id,
+        eventType: eventType.trim(),
+        birthdayPerson: birthdayPerson.trim(),
+        age: age.trim(),
         partyDate: eventDate,
+        partyTime: eventTime,
+        partyLocation: resolvedPartyLocation,
+        notes: notes.trim(),
         theme: theme.trim(),
         items: [],
         value: 0,
@@ -214,6 +241,7 @@ export default function PublicForm({ tenantId }: { tenantId: string }) {
         age: age.trim(),
         eventDate,
         eventTime,
+        eventLocation: resolvedPartyLocation,
         theme: theme.trim(),
         notes: notes.trim(),
         status: "Novo",
@@ -512,15 +540,27 @@ export default function PublicForm({ tenantId }: { tenantId: string }) {
                 </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-stone-600 mb-1">Logradouro / Rua</label>
-                <input
-                  type="text"
-                  value={address}
-                  onChange={(e) => setAddress(e.target.value)}
-                  placeholder="Rua, Avenida..."
-                  className="w-full rounded-xl border border-stone-200 bg-white px-4 py-2.5 text-sm text-stone-800 outline-none focus:border-pink-400"
-                />
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="sm:col-span-2">
+                  <label className="block text-xs font-semibold text-stone-600 mb-1">Logradouro / Rua</label>
+                  <input
+                    type="text"
+                    value={address}
+                    onChange={(e) => setAddress(e.target.value)}
+                    placeholder="Rua, Avenida..."
+                    className="w-full rounded-xl border border-stone-200 bg-white px-4 py-2.5 text-sm text-stone-800 outline-none focus:border-pink-400"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-stone-600 mb-1">Complemento</label>
+                  <input
+                    type="text"
+                    value={complement}
+                    onChange={(e) => setComplement(e.target.value)}
+                    placeholder="Apto, Bloco..."
+                    className="w-full rounded-xl border border-stone-200 bg-white px-4 py-2.5 text-sm text-stone-800 outline-none focus:border-pink-400"
+                  />
+                </div>
               </div>
 
               <div className="grid grid-cols-3 gap-2">

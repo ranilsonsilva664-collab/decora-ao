@@ -356,7 +356,7 @@ export default function PublicSign({
                   🎉 <b>Tema:</b> {contract.theme}
                 </p>
                 <p>
-                  🗓️ <b>Data da Festa:</b> {fmtDate(contract.partyDate)}
+                  🗓️ <b>Data da Festa:</b> {fmtDate(contract.partyDate)}{contract.partyTime ? ` às ${contract.partyTime}` : ""}
                 </p>
                 <p>
                   📦 <b>Retirada:</b> {fmtDate(contract.pickupDate || contract.partyDate)}
@@ -364,6 +364,20 @@ export default function PublicSign({
                 <p>
                   ↩️ <b>Devolução:</b> {fmtDate(contract.returnDate || contract.partyDate)}
                 </p>
+                {(contract.partyLocation || contract.address) && (
+                  <p className="col-span-2 bg-pink-50/60 p-2 rounded-xl border border-pink-100 text-stone-700">
+                    📍 <b>Endereço / Local da Festa:</b>{" "}
+                    {contract.partyLocation ||
+                      [contract.address, contract.number ? `nº ${contract.number}` : "", contract.neighborhood, contract.city, contract.state]
+                        .filter(Boolean)
+                        .join(", ")}
+                  </p>
+                )}
+                {contract.value > 0 && (
+                  <p className="col-span-2 bg-stone-50 p-2 rounded-xl border border-stone-100 text-stone-700">
+                    💰 <b>Total:</b> {brl(contract.value)} • <b>Sinal:</b> {brl(contract.deposit)} • <b>Restante:</b> {brl(Math.max(0, contract.value - contract.deposit))}
+                  </p>
+                )}
               </div>
 
               {/* Cláusulas */}

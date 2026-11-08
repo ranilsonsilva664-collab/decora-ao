@@ -87,12 +87,24 @@ function generateNativeJsPdf(
   doc.setTextColor(147, 51, 234);
   doc.text(`CONTRATO #${contract.id.slice(0, 8).toUpperCase()} — Emissão: ${fmtDate(contract.createdAt || new Date().toISOString())}`, 14, y);
 
+  const fullClientAddress = [
+    contract.address ? `${contract.address}${contract.number ? `, nº ${contract.number}` : ""}` : "",
+    contract.complement ? `(${contract.complement})` : "",
+    contract.neighborhood ? `- ${contract.neighborhood}` : "",
+    contract.city ? `${contract.city}/${contract.state || "SP"}` : "",
+    contract.cep ? `CEP: ${contract.cep}` : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  const partyAddressText = contract.partyLocation || fullClientAddress || "Conforme combinado";
+
   // 1. Partes
   y += 10;
   doc.setFont("helvetica", "bold");
   doc.setFontSize(10);
   doc.setTextColor(30, 30, 30);
-  doc.text("1. PARTES CONTRATANTES", 14, y);
+  doc.text("1. PARTES CONTRATANTES E DADOS COMPLETOS DA CLIENTE", 14, y);
 
   y += 6;
   doc.setFont("helvetica", "normal");
@@ -105,25 +117,57 @@ function generateNativeJsPdf(
     14,
     y
   );
+  if (contract.email) {
+    y += 5;
+    doc.text(`E-mail: ${contract.email}`, 14, y);
+  }
+  if (fullClientAddress) {
+    y += 5;
+    const addrLines = doc.splitTextToSize(`Endereço Residencial: ${fullClientAddress}`, 182);
+    doc.text(addrLines, 14, y);
+    y += (addrLines.length - 1) * 4.5;
+  }
 
-  // 2. Cronograma
-  y += 10;
+  // 2. Cronograma e Local da Festa
+  y += 9;
   doc.setFont("helvetica", "bold");
   doc.setFontSize(10);
   doc.setTextColor(30, 30, 30);
-  doc.text("2. CRONOGRAMA E TEMA DA LOCAÇÃO", 14, y);
+  doc.text("2. DADOS DA FESTA, ENDEREÇO DO EVENTO E CRONOGRAMA", 14, y);
 
   y += 6;
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
   doc.setTextColor(60, 60, 60);
-  doc.text(`Tema Contratado: ${contract.theme} | Data da Festa: ${fmtDate(contract.partyDate)}`, 14, y);
+  doc.text(
+    `Tema: ${contract.theme} ${contract.eventType ? `(${contract.eventType})` : ""} | Data da Festa: ${fmtDate(contract.partyDate)}${contract.partyTime ? ` às ${contract.partyTime}` : ""}`,
+    14,
+    y
+  );
+  if (contract.birthdayPerson || contract.age) {
+    y += 5;
+    doc.text(
+      `Aniversariante: ${contract.birthdayPerson || "—"} ${contract.age ? `| Idade: ${contract.age}` : ""}`,
+      14,
+      y
+    );
+  }
   y += 5;
+  const locLines = doc.splitTextToSize(`Endereço / Local da Festa: ${partyAddressText}`, 182);
+  doc.text(locLines, 14, y);
+  y += (locLines.length - 1) * 4.5 + 5;
+
   doc.text(
     `Retirada: ${fmtDate(contract.pickupDate || contract.partyDate)} às ${contract.pickupTime || "09:00"} | Devolução: ${fmtDate(contract.returnDate || contract.partyDate)} às ${contract.returnTime || "12:00"}`,
     14,
     y
   );
+  if (contract.notes) {
+    y += 5;
+    const noteLines = doc.splitTextToSize(`Observações do Formulário: ${contract.notes}`, 182);
+    doc.text(noteLines, 14, y);
+    y += (noteLines.length - 1) * 4.5;
+  }
 
   // 3. Valores
   y += 10;
@@ -137,7 +181,7 @@ function generateNativeJsPdf(
   doc.setFontSize(9);
   doc.setTextColor(60, 60, 60);
   doc.text(
-    `Valor Total: ${brl(contract.value)} | Sinal Pago: ${brl(contract.deposit)} | Saldo Restante: ${brl(contract.value - contract.deposit)}`,
+    `Valor Total: ${brl(contract.value)} | Sinal Pago: ${brl(contract.deposit)} | Falta Pagar (Em Aberto): ${brl(Math.max(0, contract.value - contract.deposit))}`,
     14,
     y
   );
@@ -284,6 +328,19 @@ export async function downloadContractPdf({
       </div>
     `;
 
+  const fullResidentialAddress = [
+    contract.address ? `${contract.address}${contract.number ? `, nº ${contract.number}` : ""}` : "",
+    contract.complement ? `(${contract.complement})` : "",
+    contract.neighborhood ? `- ${contract.neighborhood}` : "",
+    contract.city ? `${contract.city}/${contract.state || "SP"}` : "",
+    contract.cep ? `(CEP: ${contract.cep})` : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  const partyAddressHtml = contract.partyLocation || fullResidentialAddress || "Conforme informado no cadastro";
+  const remainingAmount = Math.max(0, (contract.value || 0) - (contract.deposit || 0));
+
   container.innerHTML = `
     <div style="border: 1px solid #fce7f3; border-radius: 16px; padding: 28px; background: #ffffff;">
       <!-- Header -->
@@ -308,30 +365,52 @@ export async function downloadContractPdf({
         </div>
       </div>
 
-      <!-- Section 1: Partes -->
+      <!-- Section 1: Partes e Dados Completos da Cliente -->
       <div style="margin-bottom: 16px;">
         <div style="font-size: 10.5px; font-weight: 700; color: #9333ea; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 5px; border-left: 3px solid #ec4899; padding-left: 8px;">
-          1. Partes Contratantes
+          1. Partes Contratantes & Dados Cadastrais da Cliente
         </div>
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; background: #fafaf9; border: 1px solid #f5f5f4; padding: 10px 12px; border-radius: 10px; font-size: 10.5px;">
           <div><b style="color: #44403c;">LOCADORA:</b> ${compName}</div>
           <div><b style="color: #44403c;">RESPONSÁVEL:</b> ${companySettings.ownerName || "A Gerência"}</div>
-          <div><b style="color: #44403c;">LOCATÁRIA:</b> ${contract.clientName}</div>
+          <div><b style="color: #44403c;">LOCATÁRIA (CLIENTE):</b> ${contract.clientName}</div>
           <div><b style="color: #44403c;">CPF DA CLIENTE:</b> ${contract.cpf || "Não informado"}</div>
-          <div style="grid-column: span 2;"><b style="color: #44403c;">WHATSAPP DA CLIENTE:</b> ${contract.whatsapp || contract.clientPhone || "Não informado"}</div>
+          <div><b style="color: #44403c;">WHATSAPP / TELEFONE:</b> ${contract.whatsapp || contract.clientPhone || "Não informado"}</div>
+          <div><b style="color: #44403c;">E-MAIL:</b> ${contract.email || "Não informado"}</div>
+          <div style="grid-column: span 2; border-top: 1px dashed #e7e5e4; padding-top: 5px; margin-top: 2px;">
+            <b style="color: #44403c;">ENDEREÇO RESIDENCIAL DA CLIENTE:</b> ${fullResidentialAddress || "Não informado"}
+          </div>
         </div>
       </div>
 
-      <!-- Section 2: Cronograma -->
+      <!-- Section 2: Dados da Festa, Endereço do Evento e Cronograma -->
       <div style="margin-bottom: 16px;">
         <div style="font-size: 10.5px; font-weight: 700; color: #9333ea; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 5px; border-left: 3px solid #ec4899; padding-left: 8px;">
-          2. Objeto e Cronograma da Locação
+          2. Dados da Festa, Endereço do Evento e Cronograma de Locação
         </div>
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; background: #fafaf9; border: 1px solid #f5f5f4; padding: 10px 12px; border-radius: 10px; font-size: 10.5px;">
-          <div><b style="color: #44403c;">Tema Contratado:</b> ${contract.theme}</div>
-          <div><b style="color: #44403c;">Data do Evento:</b> ${fmtDate(contract.partyDate)}</div>
+          <div><b style="color: #44403c;">Tema Contratado:</b> ${contract.theme || "—"}</div>
+          <div><b style="color: #44403c;">Tipo de Evento:</b> ${contract.eventType || "Festa / Evento"}</div>
+          ${
+            contract.birthdayPerson || contract.age
+              ? `<div><b style="color: #44403c;">Aniversariante:</b> ${contract.birthdayPerson || "—"}</div>
+                 <div><b style="color: #44403c;">Idade:</b> ${contract.age || "—"}</div>`
+              : ""
+          }
+          <div><b style="color: #44403c;">Data da Festa:</b> ${fmtDate(contract.partyDate)}</div>
+          <div><b style="color: #44403c;">Horário Previsto da Festa:</b> ${contract.partyTime || "14:00"}</div>
+          <div style="grid-column: span 2; background: #fdf2f8; border: 1px solid #fbcfe8; padding: 6px 10px; border-radius: 8px; color: #831843;">
+            <b>📍 ENDEREÇO / LOCAL DA FESTA:</b> ${partyAddressHtml}
+          </div>
           <div><b style="color: #44403c;">Data da Retirada:</b> ${fmtDate(contract.pickupDate || contract.partyDate)} às ${contract.pickupTime || "09:00"}</div>
           <div><b style="color: #44403c;">Data da Devolução:</b> ${fmtDate(contract.returnDate || contract.partyDate)} às ${contract.returnTime || "12:00"}</div>
+          ${
+            contract.notes
+              ? `<div style="grid-column: span 2; border-top: 1px dashed #e7e5e4; padding-top: 5px;">
+                   <b style="color: #44403c;">Observações / Detalhes do Formulário:</b> ${contract.notes}
+                 </div>`
+              : ""
+          }
         </div>
         ${itemsTableHtml}
       </div>
@@ -339,12 +418,12 @@ export async function downloadContractPdf({
       <!-- Section 3: Valores -->
       <div style="margin-bottom: 16px;">
         <div style="font-size: 10.5px; font-weight: 700; color: #9333ea; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 5px; border-left: 3px solid #ec4899; padding-left: 8px;">
-          3. Valores e Pagamento
+          3. Valores e Condições de Pagamento
         </div>
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; background: #fafaf9; border: 1px solid #f5f5f4; padding: 10px 12px; border-radius: 10px; font-size: 10.5px;">
-          <div><b style="color: #44403c;">Valor Total:</b> <span style="font-weight: 700; color: #047857;">${brl(contract.value)}</span></div>
-          <div><b style="color: #44403c;">Sinal Pago:</b> <span style="font-weight: 700; color: #db2777;">${brl(contract.deposit)}</span></div>
-          <div><b style="color: #44403c;">Saldo Restante:</b> <span style="font-weight: 700; color: #b45309;">${brl(contract.value - contract.deposit)}</span></div>
+          <div><b style="color: #44403c;">Valor Total do Contrato:</b> <span style="font-weight: 700; color: #1c1917;">${brl(contract.value)}</span></div>
+          <div><b style="color: #44403c;">Sinal Pago (Reserva):</b> <span style="font-weight: 700; color: #047857;">${brl(contract.deposit)} (Pago)</span></div>
+          <div><b style="color: #44403c;">Valor em Aberto (Falta Pagar):</b> <span style="font-weight: 700; color: ${remainingAmount > 0 ? "#b45309" : "#047857"};">${brl(remainingAmount)} ${remainingAmount > 0 ? "(Falta Pagar)" : "(Quitado)"}</span></div>
           <div><b style="color: #44403c;">Formas Aceitas:</b> Pix / Dinheiro / Cartão</div>
         </div>
       </div>
