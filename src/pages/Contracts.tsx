@@ -24,7 +24,6 @@ export default function Contracts() {
     setTransactions,
     companySettings,
     contractRules,
-    setContractRules,
     tenantId,
     logAction,
   } = useStore();
@@ -452,18 +451,18 @@ export default function Contracts() {
         )}
       </div>
 
-      {/* Regras Padrão de Contrato */}
+      {/* Regras Padrão de Contrato (Somente Leitura - Bloqueado para Edição) */}
       <Card>
-        <SectionTitle
-          title="Cláusulas e Regras Padrão de Contrato"
-          subtitle="Estes termos são inseridos automaticamente em novos contratos"
-        />
-        <textarea
-          className="w-full rounded-2xl border border-white/80 bg-white/60 p-4 text-xs text-stone-700 outline-none focus:ring-2 focus:ring-lilac-400 font-mono leading-relaxed"
-          rows={7}
-          value={contractRules}
-          onChange={(e) => setContractRules(e.target.value)}
-        />
+        <div className="flex items-center justify-between mb-2">
+          <SectionTitle
+            title="Cláusulas e Regras Padrão de Contrato"
+            subtitle="Termos oficiais fixos aplicados automaticamente em todos os contratos"
+          />
+          <Badge color="gray">🔒 Regras Fixas</Badge>
+        </div>
+        <div className="w-full rounded-2xl border border-stone-200/80 bg-stone-50/80 p-4 text-xs text-stone-600 font-mono leading-relaxed whitespace-pre-line select-none">
+          {contractRules}
+        </div>
       </Card>
 
       {/* MODAL: NOVO / EDITAR CONTRATO */}
@@ -665,13 +664,10 @@ export default function Contracts() {
             </Field>
           </div>
 
-          <Field label="Termos e Cláusulas Específicas do Contrato">
-            <textarea
-              className="w-full rounded-2xl border border-white/80 bg-white/60 p-4 text-xs text-stone-700 outline-none focus:ring-2 focus:ring-lilac-400 font-mono leading-relaxed"
-              rows={6}
-              value={c.customTerms || ""}
-              onChange={(e) => setC({ ...c, customTerms: e.target.value })}
-            />
+          <Field label="Termos e Cláusulas do Contrato (Fixo)">
+            <div className="w-full rounded-2xl border border-stone-200/80 bg-stone-50/80 p-4 text-xs text-stone-600 font-mono leading-relaxed whitespace-pre-line select-none max-h-40 overflow-y-auto">
+              {c.customTerms || contractRules}
+            </div>
           </Field>
         </div>
 

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Card, SectionTitle, Button, Field, Input, Textarea, Select } from "../components/ui";
+import { Card, SectionTitle, Button, Field, Input, Select } from "../components/ui";
 import { Icon } from "../components/icons";
 import { useStore } from "../lib/store";
 import { useToast } from "../components/Toast";
@@ -330,19 +330,22 @@ export default function Company() {
         </div>
       </Card>
 
-      {/* Cláusulas Padrão */}
+      {/* Cláusulas Padrão (Somente Leitura - Bloqueado para Edição) */}
       <Card className="space-y-3">
-        <p className="text-sm font-bold text-stone-800 uppercase tracking-wider">
-          Termos e Cláusulas Gerais de Locação
-        </p>
+        <div className="flex items-center justify-between">
+          <p className="text-sm font-bold text-stone-800 uppercase tracking-wider">
+            Termos e Cláusulas Gerais de Locação
+          </p>
+          <span className="rounded-full bg-stone-100 px-3 py-1 text-[11px] font-bold text-stone-600">
+            🔒 Regras Fixas do Contrato
+          </span>
+        </div>
         <p className="text-xs text-stone-500">
-          Este texto será inserido como cláusula padrão em todos os novos contratos gerados.
+          Cláusulas padrão oficiais aplicadas automaticamente em todos os contratos gerados.
         </p>
-        <Textarea
-          rows={8}
-          value={settings.terms || ""}
-          onChange={(e) => setSettings({ ...settings, terms: e.target.value })}
-        />
+        <div className="w-full rounded-2xl border border-stone-200/80 bg-stone-50/80 p-4 text-xs text-stone-600 font-mono leading-relaxed whitespace-pre-line select-none">
+          {settings.terms || ""}
+        </div>
       </Card>
 
       {/* Chave de Acesso & Privacidade Comercial */}
