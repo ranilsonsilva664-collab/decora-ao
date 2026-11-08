@@ -42,6 +42,18 @@ export default function PublicForm({ tenantId }: { tenantId: string }) {
   const [eventLocation, setEventLocation] = useState("");
   const [notes, setNotes] = useState("");
 
+  // Pagamento 50% via Pix
+  const [pixPaymentOption, setPixPaymentOption] = useState<"pagar_50_pix" | "ja_paguei_50_pix">("pagar_50_pix");
+  const [copiedPix, setCopiedPix] = useState(false);
+  const PIX_KEY = "81997264363";
+  const PIX_HOLDER = "Francisco de Assis da Silva";
+
+  const handleCopyPix = () => {
+    navigator.clipboard.writeText(PIX_KEY);
+    setCopiedPix(true);
+    setTimeout(() => setCopiedPix(false), 2500);
+  };
+
   useEffect(() => {
     async function loadTenant() {
       try {
@@ -179,6 +191,12 @@ export default function PublicForm({ tenantId }: { tenantId: string }) {
 
       const resolvedPartyLocation = eventLocation.trim() || fullResAddress;
 
+      const pixNoteText =
+        pixPaymentOption === "ja_paguei_50_pix"
+          ? "[Pagamento: Cliente informou que JÁ REALIZOU os 50% via Pix (Chave 81997264363 - Francisco de Assis da Silva)]"
+          : "[Pagamento: Opção selecionada de 50% via Pix para garantir a data (Chave 81997264363 - Francisco de Assis da Silva)]";
+      const combinedNotes = [notes.trim(), pixNoteText].filter(Boolean).join(" | ");
+
       const newContract: Contract = sanitizeContract({
         id: contractId,
         clientId,
@@ -201,7 +219,7 @@ export default function PublicForm({ tenantId }: { tenantId: string }) {
         partyDate: eventDate,
         partyTime: eventTime,
         partyLocation: resolvedPartyLocation,
-        notes: notes.trim(),
+        notes: combinedNotes,
         theme: theme.trim(),
         items: [],
         value: 0,
@@ -243,7 +261,7 @@ export default function PublicForm({ tenantId }: { tenantId: string }) {
         eventTime,
         eventLocation: resolvedPartyLocation,
         theme: theme.trim(),
-        notes: notes.trim(),
+        notes: combinedNotes,
         status: "Novo",
         createdAt: new Date().toISOString(),
       };
@@ -400,6 +418,42 @@ export default function PublicForm({ tenantId }: { tenantId: string }) {
             </div>
           </div>
 
+          {/* Box de Pagamento dos 50% via Pix na Tela de Confirmação */}
+          <div className="rounded-2xl bg-gradient-to-br from-emerald-50 to-teal-50 p-4 text-left border-2 border-emerald-200 space-y-3 shadow-sm">
+            <div className="flex items-start gap-2.5">
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-emerald-500 text-white text-base font-bold">
+                💠
+              </span>
+              <div>
+                <h3 className="text-xs font-extrabold uppercase tracking-wider text-emerald-800">
+                  Garantia de Reserva — Pagamento de 50% via Pix
+                </h3>
+                <p className="text-xs font-semibold text-emerald-700 mt-0.5 leading-snug">
+                  Agendamento mediante pagamento de 50%. Pagando os 50% sua data está <b>100% garantida</b>!
+                </p>
+              </div>
+            </div>
+
+            <div className="rounded-xl bg-white p-3 border border-emerald-200/80 space-y-1.5 text-xs">
+              <div className="flex items-center justify-between">
+                <span className="text-stone-500 font-medium">Chave Pix (Celular):</span>
+                <span className="font-black text-stone-900 text-sm tracking-wide">{PIX_KEY}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-stone-500 font-medium">Favorecido:</span>
+                <span className="font-bold text-stone-800">{PIX_HOLDER}</span>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleCopyPix}
+              className="w-full rounded-xl bg-emerald-600 py-2.5 px-4 text-xs font-extrabold text-white shadow-sm hover:bg-emerald-700 transition cursor-pointer"
+            >
+              {copiedPix ? "✅ Chave Pix Copiada! (81997264363)" : "📋 Copiar Chave Pix: 81997264363"}
+            </button>
+          </div>
+
           <div className="space-y-2.5 pt-2">
             {signUrl && (
               <a
@@ -410,19 +464,19 @@ export default function PublicForm({ tenantId }: { tenantId: string }) {
               </a>
             )}
 
-            {companyContact && (
-              <a
-                href={waLink(
-                  companyContact,
-                  `Olá! Acabei de enviar o formulário e gerar o contrato para a festa *${theme}* (${name}). 💕`
-                )}
-                target="_blank"
-                rel="noreferrer"
-                className="w-full inline-flex items-center justify-center gap-2 rounded-2xl bg-emerald-500 py-3 px-5 text-xs font-bold text-white shadow-md shadow-emerald-200 hover:bg-emerald-600 transition"
-              >
-                💬 Falar com a Empresa no WhatsApp
-              </a>
-            )}
+            <a
+              href={waLink(
+                companyContact || PIX_KEY,
+                `Olá! Acabei de enviar o formulário para a festa *${theme}* (${name}) na data *${fmtDate(
+                  eventDate
+                )}* e vou enviar o comprovante dos 50% via Pix para garantir 100% minha data! 💕`
+              )}
+              target="_blank"
+              rel="noreferrer"
+              className="w-full inline-flex items-center justify-center gap-2 rounded-2xl bg-emerald-500 py-3 px-5 text-xs font-bold text-white shadow-md shadow-emerald-200 hover:bg-emerald-600 transition"
+            >
+              💬 Enviar Comprovante do Pix no WhatsApp
+            </a>
           </div>
 
           <p className="text-[11px] text-stone-400">
@@ -709,6 +763,128 @@ export default function PublicForm({ tenantId }: { tenantId: string }) {
                 placeholder="Conte-nos como você imagina a decoração..."
                 className="w-full rounded-xl border border-stone-200 bg-white px-4 py-3 text-sm text-stone-800 outline-none focus:border-pink-400"
               />
+            </div>
+          </div>
+
+          {/* Seção 3: Pagamento dos 50% pelo Pix e Garantia da Data */}
+          <div className="rounded-3xl bg-white/90 p-6 backdrop-blur-xl shadow-xl shadow-emerald-100/60 border-2 border-emerald-200 space-y-4">
+            <h2 className="text-base font-bold text-stone-800 flex items-center gap-2">
+              <span className="grid h-7 w-7 place-items-center rounded-xl bg-emerald-100 text-emerald-700 text-xs font-bold">
+                3
+              </span>
+              Pagamento dos 50% via Pix (Reserva da Data)
+            </h2>
+
+            {/* Aviso importante de 50% */}
+            <div className="rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 p-4 text-white shadow-md shadow-emerald-200/70">
+              <div className="flex items-start gap-3">
+                <span className="text-2xl shrink-0">🔒</span>
+                <div>
+                  <p className="text-xs font-extrabold uppercase tracking-wider text-emerald-100">
+                    Garantia de Agendamento
+                  </p>
+                  <p className="text-sm font-bold leading-snug mt-0.5">
+                    Agendamento mediante pagamento de 50% — pagando os 50% sua data está 100% garantida!
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Opção de Pagamento pelo Pix */}
+            <div className="space-y-2">
+              <label className="block text-xs font-bold text-stone-700">
+                Selecione a opção de pagamento do sinal (50% via Pix):
+              </label>
+
+              <label
+                onClick={() => setPixPaymentOption("pagar_50_pix")}
+                className={`flex items-start gap-3 rounded-2xl border p-3.5 cursor-pointer transition ${
+                  pixPaymentOption === "pagar_50_pix"
+                    ? "border-emerald-500 bg-emerald-50/70 ring-2 ring-emerald-200"
+                    : "border-stone-200 bg-white hover:bg-stone-50"
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="pixPaymentOption"
+                  checked={pixPaymentOption === "pagar_50_pix"}
+                  onChange={() => setPixPaymentOption("pagar_50_pix")}
+                  className="mt-1 accent-emerald-600"
+                />
+                <div className="text-xs">
+                  <p className="font-bold text-stone-800">
+                    💠 Pagar 50% de Sinal pelo Pix (Garantir 100% a minha data)
+                  </p>
+                  <p className="text-stone-500 mt-0.5">
+                    Copie a chave Pix abaixo para realizar o pagamento dos 50% do sinal e garantir sua reserva.
+                  </p>
+                </div>
+              </label>
+
+              <label
+                onClick={() => setPixPaymentOption("ja_paguei_50_pix")}
+                className={`flex items-start gap-3 rounded-2xl border p-3.5 cursor-pointer transition ${
+                  pixPaymentOption === "ja_paguei_50_pix"
+                    ? "border-emerald-500 bg-emerald-50/70 ring-2 ring-emerald-200"
+                    : "border-stone-200 bg-white hover:bg-stone-50"
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="pixPaymentOption"
+                  checked={pixPaymentOption === "ja_paguei_50_pix"}
+                  onChange={() => setPixPaymentOption("ja_paguei_50_pix")}
+                  className="mt-1 accent-emerald-600"
+                />
+                <div className="text-xs">
+                  <p className="font-bold text-stone-800">
+                    ✅ Já realizei o pagamento dos 50% via Pix
+                  </p>
+                  <p className="text-stone-500 mt-0.5">
+                    Já fiz o Pix de 50% e enviarei o comprovante pelo WhatsApp após finalizar.
+                  </p>
+                </div>
+              </label>
+            </div>
+
+            {/* Card com a Chave Pix e Nome do Titular */}
+            <div className="rounded-2xl bg-emerald-50/90 border border-emerald-200 p-4 space-y-3">
+              <div className="flex items-center justify-between border-b border-emerald-200/70 pb-2">
+                <span className="text-xs font-extrabold uppercase tracking-wider text-emerald-800 flex items-center gap-1.5">
+                  <span>💠</span> Dados para Pagamento Pix (50%)
+                </span>
+                <span className="rounded-full bg-emerald-600 px-2.5 py-0.5 text-[10px] font-bold text-white">
+                  Reserva 100% Garantida
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
+                <div className="rounded-xl bg-white p-3 border border-emerald-100">
+                  <span className="text-[10px] font-bold uppercase text-stone-400 block">
+                    Chave Pix (Telefone/Celular)
+                  </span>
+                  <span className="text-base font-black text-emerald-700 tracking-wide mt-0.5 block">
+                    {PIX_KEY}
+                  </span>
+                </div>
+
+                <div className="rounded-xl bg-white p-3 border border-emerald-100">
+                  <span className="text-[10px] font-bold uppercase text-stone-400 block">
+                    Nome / Favorecido
+                  </span>
+                  <span className="text-sm font-extrabold text-stone-800 mt-0.5 block">
+                    {PIX_HOLDER}
+                  </span>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleCopyPix}
+                className="w-full flex items-center justify-center gap-2 rounded-xl bg-emerald-600 py-3 px-4 text-xs font-extrabold text-white shadow-md shadow-emerald-200 hover:bg-emerald-700 transition active:scale-98 cursor-pointer"
+              >
+                {copiedPix ? "✅ Chave Pix 81997264363 Copiada!" : "📋 Copiar Chave Pix (81997264363)"}
+              </button>
             </div>
           </div>
 

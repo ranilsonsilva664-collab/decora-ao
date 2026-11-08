@@ -23,6 +23,16 @@ export default function PublicSign({
   const [signerName, setSignerName] = useState("");
   const [saving, setSaving] = useState(false);
   const [signedSuccess, setSignedSuccess] = useState(false);
+  const [copiedPix, setCopiedPix] = useState(false);
+
+  const PIX_KEY = "81997264363";
+  const PIX_HOLDER = "Francisco de Assis da Silva";
+
+  const handleCopyPix = () => {
+    navigator.clipboard.writeText(PIX_KEY);
+    setCopiedPix(true);
+    setTimeout(() => setCopiedPix(false), 2500);
+  };
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const drawing = useRef(false);
@@ -386,6 +396,42 @@ export default function PublicSign({
                 <div className="max-h-48 overflow-y-auto rounded-2xl bg-stone-50 p-3 text-xs text-stone-600 whitespace-pre-line leading-relaxed border border-stone-200">
                   {contract.customTerms || "Conforme regras de conservação e devolução acordadas."}
                 </div>
+              </div>
+
+              {/* Pagamento dos 50% via Pix */}
+              <div className="rounded-2xl bg-gradient-to-br from-emerald-50 to-teal-50 p-4 border-2 border-emerald-200 space-y-2.5">
+                <div className="flex items-start gap-2.5">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-emerald-500 text-white text-sm font-bold">
+                    💠
+                  </span>
+                  <div>
+                    <p className="text-xs font-extrabold uppercase tracking-wider text-emerald-800">
+                      Pagamento dos 50% pelo Pix
+                    </p>
+                    <p className="text-xs font-semibold text-emerald-700 leading-snug">
+                      Agendamento mediante pagamento de 50% — pagando os 50% sua data está <b>100% garantida</b>!
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                  <div className="rounded-xl bg-white p-2.5 border border-emerald-100">
+                    <span className="text-[10px] font-bold uppercase text-stone-400 block">Chave Pix</span>
+                    <span className="text-sm font-black text-emerald-700">{PIX_KEY}</span>
+                  </div>
+                  <div className="rounded-xl bg-white p-2.5 border border-emerald-100">
+                    <span className="text-[10px] font-bold uppercase text-stone-400 block">Favorecido</span>
+                    <span className="text-xs font-extrabold text-stone-800">{PIX_HOLDER}</span>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleCopyPix}
+                  className="w-full rounded-xl bg-emerald-600 py-2.5 px-3 text-xs font-extrabold text-white shadow-xs hover:bg-emerald-700 transition cursor-pointer"
+                >
+                  {copiedPix ? "✅ Chave Pix Copiada! (81997264363)" : "📋 Copiar Chave Pix: 81997264363"}
+                </button>
               </div>
             </div>
 
