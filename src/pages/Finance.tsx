@@ -73,6 +73,7 @@ export default function Finance() {
     contracts,
     setContracts,
     companySettings,
+    updateMultipleFields,
     logAction,
   } = useStore();
   const toast = useToast();
@@ -272,7 +273,7 @@ export default function Finance() {
   };
 
   // Confirmar recebimento de valor em aberto (Falta Pagar -> Pago e gera valor que entrou no mês)
-  const confirmOpenPayment = (item: Transaction) => {
+  const confirmOpenPayment = async (item: Transaction) => {
     const updated = safeTransactions.map((t) =>
       t.id === item.id
         ? {
@@ -283,15 +284,18 @@ export default function Finance() {
           }
         : t
     );
-    setTransactions(updated);
+
+    const payloadToSave: Record<string, any> = {
+      transactions: updated,
+    };
 
     if (item.contractId) {
-      setContracts(
-        (contracts || []).map((c) =>
-          c.id === item.contractId ? { ...c, paymentRemainderConfirmed: true } : c
-        )
+      payloadToSave.contracts = (contracts || []).map((c) =>
+        c.id === item.contractId ? { ...c, paymentRemainderConfirmed: true } : c
       );
     }
+
+    await updateMultipleFields(payloadToSave);
 
     const newMonthTotal = recebidoMes + item.amount;
     logAction(

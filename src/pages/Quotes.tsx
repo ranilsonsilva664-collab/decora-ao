@@ -71,6 +71,7 @@ export default function Quotes() {
     formSubmissions,
     companySettings,
     contractRules,
+    updateMultipleFields,
     logAction,
   } = useStore();
 
@@ -238,7 +239,7 @@ export default function Quotes() {
   };
 
   // REQUISITO 18: FECHAR DECORAÇÃO / TRANSFORMAR ORÇAMENTO EM CONTRATO E LANÇAR NO FINANCEIRO
-  const transformToContract = (item: Quote) => {
+  const transformToContract = async (item: Quote) => {
     const client = clients.find(
       (c) =>
         (item.clientId && c.id === item.clientId) ||
@@ -280,20 +281,24 @@ export default function Quotes() {
     const updatedQuotes = quotes.map((x) =>
       x.id === item.id ? { ...x, status: "Convertido em contrato" as const } : x
     );
-    setQuotes(updatedQuotes);
 
     // Add new contract
-    setContracts([newContract, ...contracts]);
+    const updatedContracts = [newContract, ...contracts];
 
-    // REQUISITO: Enviar valor do Sinal (Pago) e Valor em Aberto (Falta Pagar) automaticamente para o Financeiro
+    // Sincronizar valor do Sinal (Pago) e Valor em Aberto (Falta Pagar) automaticamente com o Financeiro
     const updatedTransactions = syncContractFinancials(
       newContract,
       transactions,
       item.paymentMethod || "Pix"
     );
-    setTransactions(updatedTransactions);
 
-    // REQUISITO: Automaticamente ir para a agenda e eventos na data preenchida
+    const payloadToSave: Record<string, any> = {
+      quotes: updatedQuotes,
+      contracts: updatedContracts,
+      transactions: updatedTransactions,
+    };
+
+    // Automaticamente agendar no calendário e na lista de eventos
     if (newContract.partyDate) {
       const alreadyScheduled = (events || []).some(
         (ev) =>
@@ -310,7 +315,7 @@ export default function Quotes() {
           pickupTime: newContract.pickupTime || "09:00",
           returnTime: newContract.returnTime || "12:00",
         };
-        setEvents([calEv, ...(events || [])]);
+        payloadToSave.events = [calEv, ...(events || [])];
       }
 
       const alreadyInEventsList = (eventsList || []).some(
@@ -341,9 +346,11 @@ export default function Quotes() {
           notes: newContract.notes || "",
           createdAt: new Date().toISOString(),
         };
-        setEventsList([newEvModel, ...(eventsList || [])]);
+        payloadToSave.eventsList = [newEvModel, ...(eventsList || [])];
       }
     }
+
+    await updateMultipleFields(payloadToSave);
 
     logAction(
       "Decoração Fechada e Lançada no Financeiro",

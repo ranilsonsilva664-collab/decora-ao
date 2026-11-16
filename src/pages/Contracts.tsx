@@ -7,7 +7,8 @@ import { copy, waLink, normalizeWaPhone } from "../lib/helpers";
 import { useToast } from "../components/Toast";
 import type { Contract, ContractStatus } from "../lib/types";
 import { downloadContractPdf } from "../utils/contractPdf";
-import { sanitizeContract, enrichContractData, syncContractFinancials } from "../lib/firestoreUtils";
+import { sanitizeContract, enrichContractData, syncContractFinancials, parseMonetaryValue } from "../lib/firestoreUtils";
+import type { TenantData } from "../lib/types";
 
 export default function Contracts() {
   const {
@@ -25,6 +26,7 @@ export default function Contracts() {
     companySettings,
     contractRules,
     tenantId,
+    updateMultipleFields,
     logAction,
   } = useStore();
 
@@ -90,31 +92,38 @@ export default function Contracts() {
     );
   };
 
-  const save = () => {
+  const save = async () => {
     if (!c.clientName.trim()) return toast("Informe a cliente");
     const exists = contracts.some((x) => x.id === c.id);
+    const parsedVal = parseMonetaryValue(c.value);
+    const parsedDep = parseMonetaryValue(c.deposit);
+
     const enriched = enrichContractData(
       sanitizeContract({
         ...c,
         clientName: c.clientName.trim(),
+        value: parsedVal,
+        deposit: parsedDep,
         customTerms: c.customTerms || companySettings.terms || contractRules || "",
       }),
       clients,
       formSubmissions,
       eventsList
     );
-    const updated = exists
+
+    const updatedContracts = exists
       ? contracts.map((x) => (x.id === c.id ? enriched : x))
       : [enriched, ...contracts];
-    setContracts(updated);
 
-    // REQUISITO: Sincronizar Sinal (Pago) e Valor em Aberto (Falta Pagar) com o Financeiro
-    if (enriched.value > 0 || enriched.deposit > 0) {
-      const updatedTx = syncContractFinancials(enriched, transactions);
-      setTransactions(updatedTx);
-    }
+    // Sincronizar Sinal (Pago) e Valor em Aberto (Falta Pagar) com o Financeiro
+    const updatedTx = syncContractFinancials(enriched, transactions);
 
-    // REQUISITO: Assim que o contrato for gerado ir automaticamente para agenda na data preenchida
+    const fieldsToSave: Partial<TenantData> = {
+      contracts: updatedContracts,
+      transactions: updatedTx,
+    };
+
+    // Assim que o contrato for gerado ir automaticamente para agenda na data preenchida
     if (enriched.partyDate) {
       const alreadyScheduled = (events || []).some(
         (ev) =>
@@ -131,9 +140,12 @@ export default function Contracts() {
           pickupTime: enriched.pickupTime || "09:00",
           returnTime: enriched.returnTime || "12:00",
         };
-        setEvents([newCalendarEvent, ...(events || [])]);
+        fieldsToSave.events = [newCalendarEvent, ...(events || [])];
       }
     }
+
+    // Salva atomicamente no Firestore de uma única vez para evitar race condition
+    await updateMultipleFields(fieldsToSave);
 
     setOpen(false);
     logAction(
@@ -144,7 +156,7 @@ export default function Contracts() {
     );
     toast(
       exists
-        ? "Contrato e financeiro atualizados!"
+        ? "Contrato atualizado e valores sincronizados com o Financeiro! ✨"
         : "Contrato gerado, agendado e lançado no Financeiro (Sinal Pago / Falta Pagar)!"
     );
   };
@@ -636,32 +648,48 @@ export default function Contracts() {
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Valor Total do Contrato (R$)">
               <Input
-                type="number"
-                step="0.01"
-                min="0"
+                type="text"
+                inputMode="decimal"
                 value={c.value === 0 || (c.value as any) === "" ? "" : c.value}
                 placeholder="0.00"
                 onFocus={(e) => e.target.select()}
                 onChange={(e) => {
-                  const val = e.target.value;
-                  setC({ ...c, value: val === "" ? ("" as any) : Number(val) });
+                  const val = e.target.value.replace(/[^\d.,]/g, "");
+                  setC({ ...c, value: val });
                 }}
               />
             </Field>
             <Field label="Valor do Sinal (R$)">
               <Input
-                type="number"
-                step="0.01"
-                min="0"
+                type="text"
+                inputMode="decimal"
                 value={c.deposit === 0 || (c.deposit as any) === "" ? "" : c.deposit}
                 placeholder="0.00"
                 onFocus={(e) => e.target.select()}
                 onChange={(e) => {
-                  const val = e.target.value;
-                  setC({ ...c, deposit: val === "" ? ("" as any) : Number(val) });
+                  const val = e.target.value.replace(/[^\d.,]/g, "");
+                  setC({ ...c, deposit: val });
                 }}
               />
             </Field>
+          </div>
+
+          {/* Resumo financeiro do contrato em tempo real */}
+          <div className="rounded-2xl bg-gradient-to-r from-pink-50 via-purple-50 to-emerald-50 p-3.5 border border-pink-100 flex items-center justify-between text-xs font-bold text-stone-700">
+            <div>
+              <span className="text-[10px] text-stone-400 block uppercase">Total Contrato</span>
+              <span className="text-sm font-extrabold text-stone-800">{brl(parseMonetaryValue(c.value))}</span>
+            </div>
+            <div>
+              <span className="text-[10px] text-emerald-600 block uppercase">Sinal (Entra como Pago)</span>
+              <span className="text-sm font-extrabold text-emerald-600">{brl(parseMonetaryValue(c.deposit))}</span>
+            </div>
+            <div>
+              <span className="text-[10px] text-amber-600 block uppercase">Falta Pagar (Em Aberto)</span>
+              <span className="text-sm font-extrabold text-amber-600">
+                {brl(Math.max(0, parseMonetaryValue(c.value) - parseMonetaryValue(c.deposit)))}
+              </span>
+            </div>
           </div>
 
           <Field label="Termos e Cláusulas do Contrato (Fixo)">

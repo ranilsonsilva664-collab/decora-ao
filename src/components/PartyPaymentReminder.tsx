@@ -16,6 +16,8 @@ export interface PendingPartyReminderItem {
   theme: string;
   partyDate: string;
   isToday: boolean;
+  isPast: boolean;
+  isUpcoming: boolean;
   depositPaid: number;
   remainingAmount: number;
   method?: string;
@@ -24,15 +26,15 @@ export interface PendingPartyReminderItem {
 export function PartyPaymentReminder() {
   const {
     transactions,
-    setTransactions,
     contracts,
-    setContracts,
     clients,
+    updateMultipleFields,
     logAction,
   } = useStore();
   const toast = useToast();
   const [dismissedKeys, setDismissedKeys] = useState<string[]>([]);
   const [selectedMethods, setSelectedMethods] = useState<Record<string, string>>({});
+  const [showUpcomingList, setShowUpcomingList] = useState(true);
 
   const todayStr = new Date().toISOString().slice(0, 10);
   const safeTransactions = transactions || [];
@@ -45,16 +47,16 @@ export function PartyPaymentReminder() {
       .reduce((acc, t) => acc + (t.amount || 0), 0);
   }, [safeTransactions]);
 
-  // Identifica festas agendadas para hoje (ou cuja data já chegou) que possuem valor em aberto ("Falta Pagar")
-  const pendingReminders = useMemo(() => {
+  // Identifica todas as festas com saldo em aberto (tanto de hoje, vencidas, quanto próximas)
+  const allReminders = useMemo(() => {
     const items: PendingPartyReminderItem[] = [];
     const handledContractIds = new Set<string>();
 
-    // 1. Verifica transações pendentes (Falta Pagar) cuja data da festa é hoje ou já chegou
+    // 1. Verifica transações pendentes (Falta Pagar)
     safeTransactions.forEach((tx) => {
       if (tx.type !== "entrada" || tx.status === "Pago") return;
       const targetPartyDate = tx.partyDate || tx.date;
-      if (!targetPartyDate || targetPartyDate > todayStr) return;
+      if (!targetPartyDate) return;
 
       const linkedContract = tx.contractId
         ? safeContracts.find((c) => c.id === tx.contractId)
@@ -77,6 +79,10 @@ export function PartyPaymentReminder() {
           )
         : undefined;
 
+      const isToday = targetPartyDate === todayStr;
+      const isPast = targetPartyDate < todayStr;
+      const isUpcoming = targetPartyDate > todayStr;
+
       items.push({
         key: `tx-${tx.id}`,
         transactionId: tx.id,
@@ -91,16 +97,18 @@ export function PartyPaymentReminder() {
           "",
         theme: linkedContract?.theme || tx.description.replace(/^.*—\s*/, "").replace(/\s*\(.*\)$/, "") || "Decoração",
         partyDate: targetPartyDate,
-        isToday: targetPartyDate === todayStr,
+        isToday,
+        isPast,
+        isUpcoming,
         depositPaid: sinalTx ? sinalTx.amount : linkedContract?.deposit || 0,
         remainingAmount: tx.amount,
         method: tx.method || "Pix",
       });
     });
 
-    // 2. Verifica contratos agendados para hoje (ou data já chegada) que tenham saldo restante e ainda não tenham transação quitada
+    // 2. Verifica contratos que tenham saldo restante e ainda não tenham transação quitada
     safeContracts.forEach((c) => {
-      if (!c.partyDate || c.partyDate > todayStr) return;
+      if (!c.partyDate) return;
       if (c.status === "Cancelado" || c.paymentRemainderConfirmed) return;
       if (handledContractIds.has(c.id)) return;
 
@@ -122,6 +130,10 @@ export function PartyPaymentReminder() {
           cl.name.trim().toLowerCase() === c.clientName.trim().toLowerCase()
       );
 
+      const isToday = c.partyDate === todayStr;
+      const isPast = c.partyDate < todayStr;
+      const isUpcoming = c.partyDate > todayStr;
+
       items.push({
         key: `contract-${c.id}`,
         contractId: c.id,
@@ -130,22 +142,39 @@ export function PartyPaymentReminder() {
         whatsapp: c.whatsapp || c.clientPhone || matchedClient?.whatsapp || matchedClient?.phone || "",
         theme: c.theme || "Decoração Pegue e Monte",
         partyDate: c.partyDate,
-        isToday: c.partyDate === todayStr,
+        isToday,
+        isPast,
+        isUpcoming,
         depositPaid: c.deposit || 0,
         remainingAmount: remaining,
         method: "Pix",
       });
     });
 
-    // Ordena priorizando as festas de HOJE primeiro
-    return items
-      .filter((it) => !dismissedKeys.includes(it.key))
-      .sort((a, b) => (a.isToday === b.isToday ? b.partyDate.localeCompare(a.partyDate) : a.isToday ? -1 : 1));
+    return items.filter((it) => !dismissedKeys.includes(it.key));
   }, [safeTransactions, safeContracts, clients, todayStr, dismissedKeys]);
 
-  if (pendingReminders.length === 0) return null;
+  // Festas de hoje ou atrasadas (urgentes de cobrança)
+  const urgentReminders = useMemo(() => {
+    return allReminders
+      .filter((it) => it.isToday || it.isPast)
+      .sort((a, b) => (a.isToday === b.isToday ? b.partyDate.localeCompare(a.partyDate) : a.isToday ? -1 : 1));
+  }, [allReminders]);
 
-  const confirmReceived = (item: PendingPartyReminderItem) => {
+  // Próximas festas agendadas (valores futuros em aberto)
+  const upcomingReminders = useMemo(() => {
+    return allReminders
+      .filter((it) => it.isUpcoming)
+      .sort((a, b) => a.partyDate.localeCompare(b.partyDate));
+  }, [allReminders]);
+
+  const totalUpcomingAmount = useMemo(() => {
+    return upcomingReminders.reduce((acc, it) => acc + it.remainingAmount, 0);
+  }, [upcomingReminders]);
+
+  if (allReminders.length === 0) return null;
+
+  const confirmReceived = async (item: PendingPartyReminderItem) => {
     const chosenMethod = selectedMethods[item.key] || item.method || "Pix";
     let updatedTransactions = [...safeTransactions];
 
@@ -180,20 +209,22 @@ export function PartyPaymentReminder() {
       updatedTransactions = [newPaidTx, ...updatedTransactions];
     }
 
-    setTransactions(updatedTransactions);
+    const payload: Record<string, any> = {
+      transactions: updatedTransactions,
+    };
 
     if (item.contractId) {
-      setContracts(
-        safeContracts.map((c) =>
-          c.id === item.contractId ? { ...c, paymentRemainderConfirmed: true } : c
-        )
+      payload.contracts = safeContracts.map((c) =>
+        c.id === item.contractId ? { ...c, paymentRemainderConfirmed: true } : c
       );
     }
+
+    await updateMultipleFields(payload);
 
     const newMonthTotal = monthReceivedTotal + item.remainingAmount;
 
     logAction(
-      "Valor em Aberto Recebido no Dia da Festa",
+      "Valor em Aberto Recebido",
       `Confirmado recebimento de ${brl(item.remainingAmount)} de ${item.clientName} (${item.theme}). Total de entradas no mês: ${brl(newMonthTotal)}`
     );
 
@@ -202,9 +233,20 @@ export function PartyPaymentReminder() {
     );
   };
 
+  const getDaysDiffLabel = (dateStr: string) => {
+    const dParty = new Date(dateStr + "T00:00:00");
+    const dToday = new Date(todayStr + "T00:00:00");
+    const diffDays = Math.round((dParty.getTime() - dToday.getTime()) / 86400000);
+    if (diffDays === 0) return "Hoje";
+    if (diffDays === 1) return "Amanhã";
+    if (diffDays > 1) return `Em ${diffDays} dias`;
+    return `${Math.abs(diffDays)} dias atrás`;
+  };
+
   return (
-    <div className="space-y-3 mb-5">
-      {pendingReminders.map((item) => {
+    <div className="space-y-3 mb-6">
+      {/* 1. LEMBRETES URGENTES: HOJE É O DIA DA FESTA OU SALDO VENCIDO */}
+      {urgentReminders.map((item) => {
         const currentMethod = selectedMethods[item.key] || item.method || "Pix";
         return (
           <div
@@ -219,7 +261,7 @@ export function PartyPaymentReminder() {
                 <div className="space-y-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="inline-flex items-center gap-1 rounded-full bg-amber-500 px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wider text-white">
-                      {item.isToday ? "🔔 HOJE É O DIA DA FESTA!" : `🔔 LEMBRETE DE FESTA (${fmtDate(item.partyDate)})`}
+                      {item.isToday ? "🔔 HOJE É O DIA DA FESTA!" : `🔔 FESTA EM ${fmtDate(item.partyDate)} (SALDO PENDENTE)`}
                     </span>
                     <span className="rounded-full bg-rose-100 px-2.5 py-0.5 text-[10px] font-bold text-rose-700 border border-rose-200">
                       Falta Pagar: {brl(item.remainingAmount)}
@@ -246,7 +288,7 @@ export function PartyPaymentReminder() {
                   </p>
                   <p className="text-[11px] text-stone-500">
                     💡 Ao confirmar, o sistema muda de <b>Falta Pagar</b> para <b>Pago</b> e já soma{" "}
-                    <b>+{brl(item.remainingAmount)}</b> automaticamente nas entradas deste mês!
+                    <b>+{brl(item.remainingAmount)}</b> automaticamente no faturamento deste mês!
                   </p>
                 </div>
               </div>
@@ -278,7 +320,7 @@ export function PartyPaymentReminder() {
                   <a
                     href={waLink(
                       item.whatsapp,
-                      `Olá ${item.clientName}! 💕 Tudo pronto para a festa de hoje (${item.theme})! Passando para lembrar do saldo restante da decoração no valor de *${brl(
+                      `Olá ${item.clientName}! 💕 Tudo pronto para a sua festa (${item.theme})! Passando para lembrar do saldo restante da decoração no valor de *${brl(
                         item.remainingAmount
                       )}*. Qualquer dúvida estou à disposição!`
                     )}
@@ -303,6 +345,96 @@ export function PartyPaymentReminder() {
           </div>
         );
       })}
+
+      {/* 2. NOTIFICAÇÕES DE VALORES DAS PRÓXIMAS FESTAS AGENDADAS */}
+      {upcomingReminders.length > 0 && (
+        <div className="rounded-3xl border border-pink-200/80 bg-white/95 backdrop-blur-xl p-4 sm:p-5 shadow-md shadow-pink-100/50 space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-stone-100 pb-3">
+            <div className="flex items-center gap-2.5">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-pink-500 to-purple-600 text-white text-base shadow-sm">
+                🔔
+              </span>
+              <div>
+                <h3 className="text-sm font-black text-stone-800 flex items-center gap-2">
+                  Notificações de Valores em Aberto (Próximas Festas)
+                  <span className="rounded-full bg-pink-100 text-pink-700 px-2 py-0.5 text-[10px] font-bold">
+                    {upcomingReminders.length} {upcomingReminders.length === 1 ? "festa" : "festas"}
+                  </span>
+                </h3>
+                <p className="text-xs text-stone-500">
+                  Total previsto a receber:{" "}
+                  <b className="text-pink-600 font-extrabold">{brl(totalUpcomingAmount)}</b>
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setShowUpcomingList(!showUpcomingList)}
+              className="text-xs font-bold text-pink-600 hover:text-pink-700 transition flex items-center gap-1 self-start sm:self-auto"
+            >
+              {showUpcomingList ? "Ocultar detalhes ▲" : "Ver lista de valores ▼"}
+            </button>
+          </div>
+
+          {showUpcomingList && (
+            <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3 pt-1">
+              {upcomingReminders.map((it) => (
+                <div
+                  key={it.key}
+                  className="rounded-2xl border border-stone-100 bg-stone-50/70 p-3 flex flex-col justify-between gap-2 hover:bg-stone-50 transition"
+                >
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between gap-1 text-[11px]">
+                      <span className="font-extrabold text-purple-700 bg-purple-50 px-2 py-0.5 rounded-lg border border-purple-100">
+                        🗓️ {fmtDate(it.partyDate)} ({getDaysDiffLabel(it.partyDate)})
+                      </span>
+                      <span className="font-black text-amber-700 bg-amber-50 px-2 py-0.5 rounded-lg border border-amber-200">
+                        Falta: {brl(it.remainingAmount)}
+                      </span>
+                    </div>
+
+                    <p className="font-bold text-stone-800 text-xs truncate mt-1">
+                      {it.clientName}
+                    </p>
+                    <p className="text-[11px] text-stone-500 truncate">
+                      Tema: <b>{it.theme}</b> • Sinal pago: {brl(it.depositPaid)}
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2 pt-1 border-t border-stone-200/60">
+                    <button
+                      onClick={() => confirmReceived(it)}
+                      className="flex-1 rounded-xl bg-emerald-500 py-1.5 px-2 text-[11px] font-bold text-white shadow-xs hover:bg-emerald-600 transition"
+                      title="Dar baixa no valor se já recebeu antecipado"
+                    >
+                      ✅ Já Recebi
+                    </button>
+
+                    {it.whatsapp && (
+                      <a
+                        href={waLink(
+                          it.whatsapp,
+                          `Olá ${it.clientName}! 💕 Tudo bem? Estamos preparando tudo para o tema *${it.theme}* no dia *${fmtDate(
+                            it.partyDate
+                          )}*! Passando apenas para confirmar a reserva e lembrar do saldo restante de *${brl(
+                            it.remainingAmount
+                          )}*. Qualquer dúvida estou à disposição!`
+                        )}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="rounded-xl bg-white border border-emerald-200 p-1.5 text-emerald-600 hover:bg-emerald-50 transition flex items-center justify-center"
+                        title="Enviar lembrete de saldo no WhatsApp"
+                      >
+                        <Icon.wa className="h-4 w-4" />
+                      </a>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

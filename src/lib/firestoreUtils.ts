@@ -25,6 +25,14 @@ export function sanitizeForFirestore<T>(data: T): T {
   return result as T;
 }
 
+export function parseMonetaryValue(v: any): number {
+  if (typeof v === "number") return isNaN(v) ? 0 : v;
+  if (!v) return 0;
+  const str = String(v).replace("R$", "").trim().replace(/\./g, "").replace(",", ".");
+  const num = parseFloat(str);
+  return isNaN(num) ? 0 : num;
+}
+
 /**
  * Guarantees a Contract object is always complete with no undefined fields,
  * preventing any Firestore write failure and ensuring reliable public signing.
@@ -57,11 +65,11 @@ export function sanitizeContract(c: Partial<Contract>): Contract {
     notes: (c.notes || "").trim(),
     theme: (c.theme || "").trim(),
     items: Array.isArray(c.items) ? c.items : [],
-    value: Number(c.value) || 0,
-    deposit: Number(c.deposit) || 0,
-    delivery: Number(c.delivery) || 0,
-    assembly: Number(c.assembly) || 0,
-    discount: Number(c.discount) || 0,
+    value: parseMonetaryValue(c.value),
+    deposit: parseMonetaryValue(c.deposit),
+    delivery: parseMonetaryValue(c.delivery),
+    assembly: parseMonetaryValue(c.assembly),
+    discount: parseMonetaryValue(c.discount),
     pickupDate: c.pickupDate || c.partyDate || nowStr,
     pickupTime: c.pickupTime || "09:00",
     returnDate: c.returnDate || c.partyDate || nowStr,
@@ -181,8 +189,8 @@ export function syncContractFinancials(
   paymentMethod = "Pix"
 ): Transaction[] {
   const safeList = [...(existingTransactions || [])];
-  const total = Math.max(0, Number(contract.value) || 0);
-  const deposit = Math.max(0, Number(contract.deposit) || 0);
+  const total = Math.max(0, parseMonetaryValue(contract.value));
+  const deposit = Math.max(0, parseMonetaryValue(contract.deposit));
   const remaining = Math.max(0, total - deposit);
   const todayStr = new Date().toISOString().slice(0, 10);
 
@@ -190,12 +198,15 @@ export function syncContractFinancials(
     return safeList;
   }
 
+  const cleanClient = (contract.clientName || "").trim().toLowerCase();
+
   // Find existing Sinal transaction for this contract/quote
   const sinalIdx = safeList.findIndex(
     (t) =>
       t.type === "entrada" &&
       ((t.contractId && t.contractId === contract.id) ||
-        (contract.quoteId && t.quoteId && t.quoteId === contract.quoteId)) &&
+        (contract.quoteId && t.quoteId && t.quoteId === contract.quoteId) ||
+        (cleanClient && t.client && t.client.trim().toLowerCase() === cleanClient && t.partyDate === contract.partyDate)) &&
       (t.paymentPart === "sinal" || t.category === "Sinal de Reserva")
   );
 
@@ -205,10 +216,10 @@ export function syncContractFinancials(
       type: "entrada",
       description: `Sinal Pago — ${contract.theme || "Decoração"} (${contract.clientName})`,
       category: "Sinal de Reserva",
-      clientId: contract.clientId || "",
+      clientId: contract.clientId || (sinalIdx >= 0 ? safeList[sinalIdx].clientId : ""),
       client: contract.clientName,
       contractId: contract.id,
-      quoteId: contract.quoteId || "",
+      quoteId: contract.quoteId || (sinalIdx >= 0 ? safeList[sinalIdx].quoteId : ""),
       eventId: contract.eventId || "",
       paymentPart: "sinal",
       partyDate: contract.partyDate,
@@ -232,7 +243,8 @@ export function syncContractFinancials(
     (t) =>
       t.type === "entrada" &&
       ((t.contractId && t.contractId === contract.id) ||
-        (contract.quoteId && t.quoteId && t.quoteId === contract.quoteId)) &&
+        (contract.quoteId && t.quoteId && t.quoteId === contract.quoteId) ||
+        (cleanClient && t.client && t.client.trim().toLowerCase() === cleanClient && t.partyDate === contract.partyDate)) &&
       (t.paymentPart === "restante" ||
         (t.category === "Locação Pegue e Monte" && t.paymentPart !== "sinal"))
   );
@@ -246,10 +258,10 @@ export function syncContractFinancials(
         ? `Restante Recebido — ${contract.theme || "Decoração"} (${contract.clientName})`
         : `Falta Pagar (Em Aberto) — ${contract.theme || "Decoração"} (${contract.clientName})`,
       category: "Locação Pegue e Monte",
-      clientId: contract.clientId || "",
+      clientId: contract.clientId || (restIdx >= 0 ? safeList[restIdx].clientId : ""),
       client: contract.clientName,
       contractId: contract.id,
-      quoteId: contract.quoteId || "",
+      quoteId: contract.quoteId || (restIdx >= 0 ? safeList[restIdx].quoteId : ""),
       eventId: contract.eventId || "",
       paymentPart: "restante",
       partyDate: contract.partyDate,

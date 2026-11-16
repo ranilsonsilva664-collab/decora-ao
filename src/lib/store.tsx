@@ -121,6 +121,7 @@ interface State extends TenantData {
   setActionLogs: (v: ActionLog[]) => void;
   setContractRules: (v: string) => void;
   setCatalogEnabled: (v: boolean) => void;
+  updateMultipleFields: (fields: Partial<TenantData>) => Promise<void>;
   logAction: (action: string, details: string) => void;
 }
 
@@ -366,6 +367,58 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const updateMultipleFields = async (fields: Partial<TenantData>) => {
+    if (!tenantId || isAdmin) return;
+
+    const payload: Record<string, any> = {};
+    for (const [key, value] of Object.entries(fields)) {
+      if (key === "contracts" && Array.isArray(value)) {
+        payload[key] = value.map(sanitizeContract);
+      } else {
+        payload[key] = sanitizeForFirestore(value);
+      }
+    }
+
+    // Optimistic local update
+    setData((prev) => ({ ...prev, ...payload }));
+
+    try {
+      await setDoc(doc(db, "tenant_data", tenantId), payload, { merge: true });
+
+      // Atualiza public_contracts se houver contratos no payload
+      if (payload.contracts && Array.isArray(payload.contracts)) {
+        const compSettings = {
+          name: data.companySettings?.name || currentTenant?.name || "Minha Empresa Pegue e Monte",
+          tradeName: data.companySettings?.tradeName || currentTenant?.name || "Minha Empresa",
+          logo: data.companySettings?.logo || "",
+          phone: data.companySettings?.phone || data.companySettings?.whatsapp || "",
+          terms: data.companySettings?.terms || data.contractRules || "",
+        };
+        for (const contract of payload.contracts as Contract[]) {
+          if (contract && contract.id) {
+            try {
+              const pubDocRef = doc(db, "public_contracts", `${tenantId}_${contract.id}`);
+              await setDoc(
+                pubDocRef,
+                sanitizeForFirestore({
+                  ...contract,
+                  tenantId,
+                  companySettings: compSettings,
+                  updatedAt: new Date().toISOString(),
+                }),
+                { merge: true }
+              );
+            } catch (errPub) {
+              console.warn("Aviso ao salvar cópia pública individual do contrato:", errPub);
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.error("Erro crítico ao salvar múltiplos campos no Firestore:", err);
+    }
+  };
+
   const logAction = (action: string, details: string) => {
     const newLog: ActionLog = {
       id: uid(),
@@ -405,6 +458,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         setActionLogs: (v) => updateData("actionLogs", v),
         setContractRules: (v) => updateData("contractRules", v),
         setCatalogEnabled: (v) => updateData("catalogEnabled", v),
+        updateMultipleFields,
         logAction,
       }}
     >

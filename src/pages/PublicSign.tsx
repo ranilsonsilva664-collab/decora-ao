@@ -383,11 +383,25 @@ export default function PublicSign({
                         .join(", ")}
                   </p>
                 )}
-                {contract.value > 0 && (
-                  <p className="col-span-2 bg-stone-50 p-2 rounded-xl border border-stone-100 text-stone-700">
-                    💰 <b>Total:</b> {brl(contract.value)} • <b>Sinal:</b> {brl(contract.deposit)} • <b>Restante:</b> {brl(Math.max(0, contract.value - contract.deposit))}
-                  </p>
-                )}
+                {/* Quadro de Valores do Contrato */}
+                <div className="col-span-2 rounded-2xl bg-gradient-to-r from-pink-50 via-purple-50 to-emerald-50 p-3.5 border border-pink-200">
+                  <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                    <div>
+                      <span className="text-[10px] text-stone-500 font-bold block uppercase">Valor Total</span>
+                      <span className="text-sm font-extrabold text-pink-600">{brl(contract.value || 0)}</span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-emerald-700 font-bold block uppercase">Sinal Pago</span>
+                      <span className="text-sm font-extrabold text-emerald-600">{brl(contract.deposit || 0)}</span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-amber-700 font-bold block uppercase">Falta Pagar</span>
+                      <span className="text-sm font-extrabold text-amber-600">
+                        {brl(Math.max(0, (contract.value || 0) - (contract.deposit || 0)))}
+                      </span>
+                    </div>
+                  </div>
+                </div>
               </div>
 
               {/* Cláusulas */}

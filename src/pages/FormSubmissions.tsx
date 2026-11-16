@@ -5,7 +5,7 @@ import { useStore } from "../lib/store";
 import { brl, fmtDate, uid } from "../lib/format";
 import { copy, waLink } from "../lib/helpers";
 import { useToast } from "../components/Toast";
-import { sanitizeContract, enrichContractData, syncContractFinancials } from "../lib/firestoreUtils";
+import { sanitizeContract, enrichContractData, syncContractFinancials, parseMonetaryValue } from "../lib/firestoreUtils";
 import { downloadContractPdf } from "../utils/contractPdf";
 import type { PublicFormSubmission, Contract } from "../lib/types";
 
@@ -24,6 +24,7 @@ export default function FormSubmissions() {
     companySettings,
     contractRules,
     tenantId,
+    updateMultipleFields,
     logAction,
   } = useStore();
 
@@ -146,22 +147,41 @@ export default function FormSubmissions() {
     toast("Contrato gerado e agendado no calendário com sucesso! 📄✨");
   };
 
-  const saveEditedContract = () => {
+  const saveEditedContract = async () => {
     if (!editingContract) return;
+    const val = parseMonetaryValue(editingContract.value);
+    const dep = parseMonetaryValue(editingContract.deposit);
+
     const sanitized = enrichContractData(
-      sanitizeContract(editingContract),
+      sanitizeContract({
+        ...editingContract,
+        value: val,
+        deposit: dep,
+      }),
       clients,
       safeSubmissions,
       eventsList
     );
-    setContracts(contracts.map((c) => (c.id === sanitized.id ? sanitized : c)));
 
-    if (sanitized.value > 0 || sanitized.deposit > 0) {
-      const updatedTx = syncContractFinancials(sanitized, transactions);
-      setTransactions(updatedTx);
-    }
+    const exists = contracts.some((c) => c.id === sanitized.id);
+    const updatedContracts = exists
+      ? contracts.map((c) => (c.id === sanitized.id ? sanitized : c))
+      : [sanitized, ...contracts];
+
+    const updatedTx = syncContractFinancials(sanitized, transactions);
+
+    await updateMultipleFields({
+      contracts: updatedContracts,
+      transactions: updatedTx,
+    });
 
     setEditingContract(null);
+    logAction(
+      "Contrato Ajustado",
+      `${sanitized.clientName} - ${sanitized.theme} (Total: ${brl(sanitized.value)} | Sinal: ${brl(
+        sanitized.deposit
+      )} | Falta: ${brl(Math.max(0, sanitized.value - sanitized.deposit))})`
+    );
     toast("Contrato atualizado e valores sincronizados com o Financeiro! ✨");
   };
 
@@ -446,16 +466,15 @@ export default function FormSubmissions() {
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label="Valor Total do Contrato (R$)">
                 <Input
-                  type="number"
-                  step="0.01"
-                  min="0"
+                  type="text"
+                  inputMode="decimal"
                   value={editingContract.value === 0 || (editingContract.value as any) === "" ? "" : editingContract.value}
                   placeholder="0.00"
                   onChange={(e) => {
-                    const val = e.target.value;
+                    const val = e.target.value.replace(/[^\d.,]/g, "");
                     setEditingContract({
                       ...editingContract,
-                      value: val === "" ? ("" as any) : Number(val),
+                      value: val,
                     });
                   }}
                 />
@@ -463,20 +482,37 @@ export default function FormSubmissions() {
 
               <Field label="Valor do Sinal / Reserva (R$)">
                 <Input
-                  type="number"
-                  step="0.01"
-                  min="0"
+                  type="text"
+                  inputMode="decimal"
                   value={editingContract.deposit === 0 || (editingContract.deposit as any) === "" ? "" : editingContract.deposit}
                   placeholder="0.00"
                   onChange={(e) => {
-                    const val = e.target.value;
+                    const val = e.target.value.replace(/[^\d.,]/g, "");
                     setEditingContract({
                       ...editingContract,
-                      deposit: val === "" ? ("" as any) : Number(val),
+                      deposit: val,
                     });
                   }}
                 />
               </Field>
+            </div>
+
+            {/* Resumo financeiro em tempo real */}
+            <div className="rounded-2xl bg-gradient-to-r from-pink-50 via-purple-50 to-emerald-50 p-3 border border-pink-100 flex items-center justify-between text-xs font-bold text-stone-700">
+              <div>
+                <span className="text-[10px] text-stone-400 block uppercase">Total</span>
+                <span className="text-sm font-extrabold text-stone-800">{brl(parseMonetaryValue(editingContract.value))}</span>
+              </div>
+              <div>
+                <span className="text-[10px] text-emerald-600 block uppercase">Sinal (Pago)</span>
+                <span className="text-sm font-extrabold text-emerald-600">{brl(parseMonetaryValue(editingContract.deposit))}</span>
+              </div>
+              <div>
+                <span className="text-[10px] text-amber-600 block uppercase">Falta Pagar</span>
+                <span className="text-sm font-extrabold text-amber-600">
+                  {brl(Math.max(0, parseMonetaryValue(editingContract.value) - parseMonetaryValue(editingContract.deposit)))}
+                </span>
+              </div>
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
