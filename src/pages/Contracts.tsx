@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import { Card, SectionTitle, Button, Modal, Field, Input, Select, Badge } from "../components/ui";
 import { Icon } from "../components/icons";
 import { useStore } from "../lib/store";
@@ -34,7 +34,12 @@ export default function Contracts() {
 
   const toast = useToast();
   const [open, setOpen] = useState(false);
+  const [localRules, setLocalRules] = useState(contractRules);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+
+  useEffect(() => {
+    setLocalRules(contractRules);
+  }, [contractRules]);
   const [shareContract, setShareContract] = useState<Contract | null>(null);
   const [sharePhone, setSharePhone] = useState("");
   const [shareMessage, setShareMessage] = useState("");
@@ -106,7 +111,10 @@ export default function Contracts() {
         clientName: c.clientName.trim(),
         value: parsedVal,
         deposit: parsedDep,
-        customTerms: c.customTerms || companySettings.terms || contractRules || "",
+        customTerms:
+          c.customTerms !== undefined && c.customTerms !== null
+            ? c.customTerms
+            : companySettings.terms || contractRules || "",
       }),
       clients,
       formSubmissions,
@@ -488,8 +496,8 @@ export default function Contracts() {
         <textarea
           className="w-full rounded-2xl border border-stone-200/80 bg-white/90 p-4 text-xs text-stone-700 outline-none focus:ring-2 focus:ring-lilac-400 font-mono leading-relaxed"
           rows={7}
-          value={contractRules}
-          onChange={(e) => setContractRules(e.target.value)}
+          value={localRules}
+          onChange={(e) => setLocalRules(e.target.value)}
           placeholder="Defina aqui os termos padrão aplicados nos contratos..."
         />
         <div className="mt-3 flex justify-end">
@@ -497,7 +505,7 @@ export default function Contracts() {
             variant="soft"
             className="!text-xs !py-1.5 !px-4 font-semibold"
             onClick={() => {
-              setContractRules(contractRules);
+              setContractRules(localRules);
               toast("Regras padrão salvas com sucesso! ✨");
             }}
           >
@@ -721,24 +729,24 @@ export default function Contracts() {
             </div>
           </div>
 
-          <div>
-            <div className="flex flex-wrap items-center justify-between gap-1 mb-1.5">
-              <span className="text-xs font-semibold text-stone-700">
-                Termos e Cláusulas do Contrato
+          <div className="rounded-2xl bg-amber-50/50 p-3.5 border border-amber-200/70 space-y-2">
+            <div className="flex flex-wrap items-center justify-between gap-1">
+              <span className="text-xs font-bold text-stone-800 flex items-center gap-1.5">
+                📝 Termos e Cláusulas do Contrato
               </span>
-              <span className="rounded-full bg-purple-50 border border-purple-200 px-2 py-0.5 text-[10px] font-bold text-purple-700">
-                👑 Editável apenas pelo Proprietário
+              <span className="rounded-full bg-emerald-100 border border-emerald-200 px-2 py-0.5 text-[10px] font-bold text-emerald-800">
+                ✏️ Editável (Você pode alterar o texto abaixo)
               </span>
             </div>
-            <p className="text-[11px] text-stone-500 mb-1.5">
-              Apenas você (proprietário) pode editar estes termos. A cliente apenas lê e assina, sem permissão para alterar nada.
+            <p className="text-[11px] text-stone-600 leading-snug">
+              Como proprietário, você pode alterar, acrescentar ou remover qualquer regra ou cláusula deste contrato. O cliente só poderá assinar.
             </p>
             <textarea
-              className="w-full rounded-2xl border border-stone-200/80 bg-white/90 p-3.5 text-xs text-stone-700 outline-none focus:ring-2 focus:ring-lilac-400 font-mono leading-relaxed"
-              rows={7}
-              value={c.customTerms ?? contractRules}
+              className="w-full rounded-xl border border-stone-300 bg-white p-3 text-xs text-stone-800 outline-none focus:ring-2 focus:ring-amber-400 font-mono leading-relaxed min-h-[140px]"
+              rows={8}
+              value={c.customTerms !== undefined ? c.customTerms : (companySettings.terms || contractRules || "")}
               onChange={(e) => setC({ ...c, customTerms: e.target.value })}
-              placeholder="Digite ou personalize as regras e termos deste contrato..."
+              placeholder="Digite ou personalize os termos e regras deste contrato..."
             />
           </div>
         </div>
