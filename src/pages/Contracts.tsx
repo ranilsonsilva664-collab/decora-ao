@@ -9,6 +9,7 @@ import type { Contract, ContractStatus } from "../lib/types";
 import { downloadContractPdf } from "../utils/contractPdf";
 import { sanitizeContract, enrichContractData, syncContractFinancials, parseMonetaryValue } from "../lib/firestoreUtils";
 import type { TenantData } from "../lib/types";
+import { cn } from "../utils/cn";
 
 export default function Contracts() {
   const {
@@ -324,7 +325,7 @@ export default function Contracts() {
       />
 
       {/* Contracts List */}
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid gap-4 lg:grid-cols-2 min-w-0 max-w-full">
         {contracts.map((rawItem) => {
           const item = enrichContractData(rawItem, clients, formSubmissions, eventsList);
           const client = clients.find(
@@ -333,15 +334,15 @@ export default function Contracts() {
           const remainingVal = Math.max(0, (item.value || 0) - (item.deposit || 0));
 
           return (
-            <Card key={item.id} className="animate-rise flex flex-col justify-between">
-              <div>
+            <Card key={item.id} className="animate-rise flex flex-col justify-between min-w-0 max-w-full overflow-hidden">
+              <div className="min-w-0">
                 <div className="flex items-start justify-between gap-2 mb-2">
-                  <div>
-                    <h3 className="font-bold text-stone-800 text-base">{item.clientName}</h3>
-                    <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-stone-500 mt-0.5">
-                      <span>CPF: {item.cpf || "Não informado"}</span>
+                  <div className="min-w-0 flex-1">
+                    <h3 className="font-bold text-stone-800 text-base truncate">{item.clientName}</h3>
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-stone-500 mt-0.5">
+                      <span className="shrink-0">CPF: {item.cpf || "Não informado"}</span>
                       <span>•</span>
-                      <span>Tema: <b>{item.theme}</b></span>
+                      <span className="truncate">Tema: <b>{item.theme}</b></span>
                       {(item.whatsapp || item.clientPhone || client?.whatsapp) && (
                         <>
                           <span>•</span>
@@ -349,7 +350,7 @@ export default function Contracts() {
                             href={waLink(item.whatsapp || item.clientPhone || client?.whatsapp || "", "")}
                             target="_blank"
                             rel="noreferrer"
-                            className="inline-flex items-center gap-1 font-semibold text-emerald-600 hover:text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md"
+                            className="inline-flex items-center gap-1 font-semibold text-emerald-600 hover:text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md text-[11px] truncate"
                           >
                             <span>📱</span> {item.whatsapp || item.clientPhone || client?.whatsapp}
                           </a>
@@ -357,45 +358,47 @@ export default function Contracts() {
                       )}
                     </div>
                   </div>
-                  {item.signed ? (
-                    <Badge color="green">✍️ Assinado</Badge>
-                  ) : (
-                    <Badge color="amber">Aguardando Assinatura</Badge>
-                  )}
+                  <div className="shrink-0">
+                    {item.signed ? (
+                      <Badge color="green">✍️ Assinado</Badge>
+                    ) : (
+                      <Badge color="amber">Aguardando</Badge>
+                    )}
+                  </div>
                 </div>
 
                 {item.partyLocation && (
-                  <p className="mt-1.5 text-[11px] text-stone-600 bg-white/60 px-2.5 py-1.5 rounded-xl border border-stone-100 truncate">
+                  <p className="mt-1.5 text-[11px] text-stone-600 bg-white/60 px-2.5 py-1.5 rounded-xl border border-stone-100 break-words line-clamp-2">
                     📍 <b>Local da Festa:</b> {item.partyLocation}
                   </p>
                 )}
 
-                <div className="mt-3 grid grid-cols-4 gap-2 text-center text-xs">
-                  <div className="rounded-xl bg-white/60 py-2">
+                <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-2 text-center text-xs">
+                  <div className="rounded-xl bg-white/60 py-2 px-1">
                     <p className="text-stone-400 text-[10px]">Data Festa</p>
-                    <p className="font-semibold text-stone-700">{fmtDate(item.partyDate)}</p>
+                    <p className="font-semibold text-stone-700 truncate">{fmtDate(item.partyDate)}</p>
                   </div>
-                  <div className="rounded-xl bg-white/60 py-2">
+                  <div className="rounded-xl bg-white/60 py-2 px-1">
                     <p className="text-stone-400 text-[10px]">Valor Total</p>
-                    <p className="font-semibold text-stone-700">{brl(item.value)}</p>
+                    <p className="font-semibold text-stone-700 truncate">{brl(item.value)}</p>
                   </div>
-                  <div className="rounded-xl bg-emerald-50/70 py-2 border border-emerald-100">
+                  <div className="rounded-xl bg-emerald-50/70 py-2 px-1 border border-emerald-100">
                     <p className="text-emerald-700 text-[10px] font-semibold">Sinal (Pago)</p>
-                    <p className="font-bold text-emerald-600">{brl(item.deposit)}</p>
+                    <p className="font-bold text-emerald-600 truncate">{brl(item.deposit)}</p>
                   </div>
-                  <div className="rounded-xl bg-amber-50/70 py-2 border border-amber-100">
+                  <div className="rounded-xl bg-amber-50/70 py-2 px-1 border border-amber-100">
                     <p className="text-amber-700 text-[10px] font-semibold">Falta Pagar</p>
-                    <p className="font-bold text-amber-600">{brl(remainingVal)}</p>
+                    <p className="font-bold text-amber-600 truncate">{brl(remainingVal)}</p>
                   </div>
                 </div>
 
                 {item.signed && (
                   <div className="mt-3 rounded-2xl bg-emerald-50/90 p-3 text-xs text-emerald-800 border border-emerald-200 flex items-center justify-between gap-3">
-                    <div>
-                      <p className="font-bold flex items-center gap-1.5 text-emerald-700">
+                    <div className="min-w-0 flex-1">
+                      <p className="font-bold flex items-center gap-1.5 text-emerald-700 truncate">
                         <span>✓</span> Assinado Digitalmente
                       </p>
-                      <p className="text-[11px] text-emerald-600 mt-0.5">
+                      <p className="text-[11px] text-emerald-600 mt-0.5 truncate">
                         Por <b>{item.signature}</b> {item.signedAt ? `em ${fmtDate(item.signedAt)}` : ""}
                       </p>
                     </div>
@@ -409,36 +412,36 @@ export default function Contracts() {
               </div>
 
               {/* Actions */}
-              <div className="mt-4 pt-3 border-t border-stone-100 flex flex-wrap items-center gap-2">
+              <div className="mt-4 pt-3 border-t border-stone-100 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center">
                 {/* Botão Baixar PDF DIRETO */}
                 <Button
                   variant="gold"
                   disabled={downloadingId === item.id}
-                  className="!px-3.5 !py-1.5 text-xs shadow-sm shadow-amber-200/50"
+                  className="w-full sm:w-auto !px-2.5 !py-1.5 text-xs shadow-sm shadow-amber-200/50 flex items-center justify-center gap-1.5"
                   onClick={() => handleDownloadPdf(item)}
                 >
-                  <Icon.pdf className="h-4 w-4" />
-                  {downloadingId === item.id ? "Baixando..." : "Baixar PDF"}
+                  <Icon.pdf className="h-4 w-4 shrink-0" />
+                  <span className="truncate">{downloadingId === item.id ? "Baixando..." : "Baixar PDF"}</span>
                 </Button>
 
                 {/* Botão Enviar p/ Cliente Assinar pelo WhatsApp */}
                 <Button
                   variant="wa"
-                  className="!px-3.5 !py-1.5 text-xs shadow-sm shadow-emerald-200/50"
+                  className="w-full sm:w-auto !px-2.5 !py-1.5 text-xs shadow-sm shadow-emerald-200/50 flex items-center justify-center gap-1.5"
                   onClick={() => openShareModal(item)}
                 >
-                  <Icon.wa className="h-4 w-4" /> Enviar p/ Assinar
+                  <Icon.wa className="h-4 w-4 shrink-0" /> <span className="truncate">Enviar p/ Assinar</span>
                 </Button>
 
                 {!item.signed && (
                   <Button
-                    className="!px-3 !py-1.5 text-xs"
+                    className="w-full sm:w-auto !px-2.5 !py-1.5 text-xs flex items-center justify-center gap-1"
                     onClick={() => {
                       setSignOpen(item);
                       setTimeout(clearSig, 50);
                     }}
                   >
-                    ✍️ Assinar no App
+                    ✍️ <span className="truncate">Assinar no App</span>
                   </Button>
                 )}
 
@@ -447,9 +450,12 @@ export default function Contracts() {
                     setC(enrichContractData(rawItem, clients, formSubmissions, eventsList));
                     setOpen(true);
                   }}
-                  className="ml-auto rounded-xl bg-white/80 px-3 py-1.5 text-xs font-semibold text-stone-600 hover:bg-white shadow-sm"
+                  className={cn(
+                    "w-full sm:w-auto rounded-xl bg-white/80 px-3 py-1.5 text-xs font-semibold text-stone-600 hover:bg-white shadow-sm border border-stone-200/60 transition text-center",
+                    item.signed ? "col-span-2 sm:col-span-1 sm:ml-auto" : "sm:ml-auto"
+                  )}
                 >
-                  Editar
+                  ✏️ Editar
                 </button>
               </div>
             </Card>
