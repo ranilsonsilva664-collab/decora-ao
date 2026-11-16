@@ -26,6 +26,7 @@ export default function Contracts() {
     setTransactions,
     companySettings,
     contractRules,
+    setContractRules,
     tenantId,
     updateMultipleFields,
     logAction,
@@ -447,7 +448,11 @@ export default function Contracts() {
 
                 <button
                   onClick={() => {
-                    setC(enrichContractData(rawItem, clients, formSubmissions, eventsList));
+                    const enriched = enrichContractData(rawItem, clients, formSubmissions, eventsList);
+                    setC({
+                      ...enriched,
+                      customTerms: enriched.customTerms || companySettings.terms || contractRules || "",
+                    });
                     setOpen(true);
                   }}
                   className={cn(
@@ -469,17 +474,35 @@ export default function Contracts() {
         )}
       </div>
 
-      {/* Regras Padrão de Contrato (Somente Leitura - Bloqueado para Edição) */}
+      {/* Regras Padrão de Contrato */}
       <Card>
-        <div className="flex items-center justify-between mb-2">
+        <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
           <SectionTitle
             title="Cláusulas e Regras Padrão de Contrato"
-            subtitle="Termos oficiais fixos aplicados automaticamente em todos os contratos"
+            subtitle="Estes termos são inseridos automaticamente em novos contratos"
           />
-          <Badge color="gray">🔒 Regras Fixas</Badge>
+          <span className="rounded-full bg-purple-50 border border-purple-200 px-3 py-1 text-xs font-bold text-purple-700">
+            👑 Editável pelo Proprietário
+          </span>
         </div>
-        <div className="w-full rounded-2xl border border-stone-200/80 bg-stone-50/80 p-4 text-xs text-stone-600 font-mono leading-relaxed whitespace-pre-line select-none">
-          {contractRules}
+        <textarea
+          className="w-full rounded-2xl border border-stone-200/80 bg-white/90 p-4 text-xs text-stone-700 outline-none focus:ring-2 focus:ring-lilac-400 font-mono leading-relaxed"
+          rows={7}
+          value={contractRules}
+          onChange={(e) => setContractRules(e.target.value)}
+          placeholder="Defina aqui os termos padrão aplicados nos contratos..."
+        />
+        <div className="mt-3 flex justify-end">
+          <Button
+            variant="soft"
+            className="!text-xs !py-1.5 !px-4 font-semibold"
+            onClick={() => {
+              setContractRules(contractRules);
+              toast("Regras padrão salvas com sucesso! ✨");
+            }}
+          >
+            Salvar Regras Padrão
+          </Button>
         </div>
       </Card>
 
@@ -698,11 +721,26 @@ export default function Contracts() {
             </div>
           </div>
 
-          <Field label="Termos e Cláusulas do Contrato (Fixo)">
-            <div className="w-full rounded-2xl border border-stone-200/80 bg-stone-50/80 p-4 text-xs text-stone-600 font-mono leading-relaxed whitespace-pre-line select-none max-h-40 overflow-y-auto">
-              {c.customTerms || contractRules}
+          <div>
+            <div className="flex flex-wrap items-center justify-between gap-1 mb-1.5">
+              <span className="text-xs font-semibold text-stone-700">
+                Termos e Cláusulas do Contrato
+              </span>
+              <span className="rounded-full bg-purple-50 border border-purple-200 px-2 py-0.5 text-[10px] font-bold text-purple-700">
+                👑 Editável apenas pelo Proprietário
+              </span>
             </div>
-          </Field>
+            <p className="text-[11px] text-stone-500 mb-1.5">
+              Apenas você (proprietário) pode editar estes termos. A cliente apenas lê e assina, sem permissão para alterar nada.
+            </p>
+            <textarea
+              className="w-full rounded-2xl border border-stone-200/80 bg-white/90 p-3.5 text-xs text-stone-700 outline-none focus:ring-2 focus:ring-lilac-400 font-mono leading-relaxed"
+              rows={7}
+              value={c.customTerms ?? contractRules}
+              onChange={(e) => setC({ ...c, customTerms: e.target.value })}
+              placeholder="Digite ou personalize as regras e termos deste contrato..."
+            />
+          </div>
         </div>
 
         <div className="mt-6 flex flex-wrap items-center gap-3">

@@ -537,6 +537,26 @@ export default function FormSubmissions() {
               </Field>
             </div>
 
+            <div>
+              <div className="flex flex-wrap items-center justify-between gap-1 mb-1.5">
+                <span className="text-xs font-semibold text-stone-700">
+                  Termos e Cláusulas do Contrato
+                </span>
+                <span className="rounded-full bg-purple-50 border border-purple-200 px-2 py-0.5 text-[10px] font-bold text-purple-700">
+                  👑 Editável pelo Proprietário
+                </span>
+              </div>
+              <textarea
+                className="w-full rounded-2xl border border-stone-200/80 bg-white/90 p-3 text-xs text-stone-700 outline-none focus:ring-2 focus:ring-lilac-400 font-mono leading-relaxed"
+                rows={5}
+                value={editingContract.customTerms ?? companySettings.terms ?? contractRules}
+                onChange={(e) =>
+                  setEditingContract({ ...editingContract, customTerms: e.target.value })
+                }
+                placeholder="Termos e cláusulas específicos deste contrato..."
+              />
+            </div>
+
             <Field label="Link Seguro para Cliente Assinar">
               <div className="flex gap-2">
                 <Input
